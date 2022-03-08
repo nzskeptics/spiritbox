@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css" integrity="sha512-NmLkDIU1C/C88wi324HBc+S2kLhi08PN5GDeUVVVC/BVt/9Izdsc9SVeVfA1UZbY3sHUlDSyRXhCzHfr6hmPPw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+		<title>Spirit Box</title>
+		<script type="module">
+			// import stations from './stations.json'
+			import {createApp} from 'https://unpkg.com/petite-vue?module';
+			createApp({
+				number: 6,
+				rate: 2,
+				per: 5,
+				index: 0,
+				allStations: null,
+				interval: null,
+				play: false,
+				get stations() {
+					return this.allStations?.sort(() => Math.random() - 0.5).slice(0, this.number);
+				},
+				get station() {
+					return this.stations?.[this.index];
+				},
+				retune() {
+					clearInterval(this.interval);
+					if (this.play) this.interval = setInterval(() => {
+						this.index = Math.floor(Math.random() * this.number);
+						this.unmute(this.index);
+					}, this.per * 1000 / this.rate);
+				},
+				unmute(index) {
+					for (const i of this.stations.keys()) {
+						this.$refs['audio-' + i][0].muted = true;
+					}
+					this.$refs['audio-' + index][0].muted = false;
+				},
+				playPause() {
+					this.unmute(this.index);
+					this.play = !this.play;
+					this.retune();
+				},
+				mounted() {
+					fetch("stations.json")
+						.then((response) => response.json())
+						.then((json) => this.allStations = json);
+				},
+			}).mount('form');
+		</script>
+		<style>
+			body {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+				background: url('wood.jpg') repeat;
+			}
+			form {
+				display: flex;
+				flex-direction: column;
+				justify-content: space-between;
+				height: 80vh;
+				width: 80vw;
+				border-radius: 50px;
+				border: 10px solid #333;
+				background: url('wood.jpg') repeat;
+			}
+			.grille {
+				height: 60%;
+				border: 1px solid #ccc;
+				border-radius: 40px;
+				background: url('grille.jpg') repeat;
+			}
+		</style>
+	</head>
+	<body>
+		<form @vue:mounted="mounted">
+			<div class="grille"><img src="logo.svg" style="width: 64px"></div>
+			<div>
+				<button type='button' @click="playPause">{{play ? 'Stop' : 'Play'}}</button><!-- style="position: absolute; right: 300px; top: 300px;" -->
+				<h2><a v-if="station" :href="station.website">{{station.name}}</a></h2>
+				<input v-if="stations" id="number" type="range" min="2" max="16" v-model.number="number" :title="stations.slice(0, number).map((station) => station.name).join('\n')" @change="retune"/>
+				<input id="rate" type="range" min="1" max="10" v-model.number="rate" :title="(per / rate).toFixed(2) + ' seconds per station'" @change="retune"/>
+				{{index}}
+				<div v-if="play && stations">
+					<audio v-for="(details, id) in stations" :key="id" :ref="'audio-' + id" autoplay :src="details.url" />
+				</div>
+			</div>
+		</form>
+	</body>
+</html>
