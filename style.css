@@ -1,0 +1,142 @@
+body {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100vh;
+	background: url('wood.jpg') repeat;
+}
+form {
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	height: 100vh;
+	width: 100vw;
+	background: url('wood.jpg') repeat;
+}
+@media (min-width: 768px) {
+	form {
+		height: 80vh;
+		width: 80vw;
+		border: 10px inset #222;
+		border-radius: 50px;
+	}
+	#grille {
+		border-top-left-radius: 40px;
+		border-top-right-radius: 40px;
+	}
+	#tuner {
+		margin-left: 2em;
+		margin-right: 2em;
+	}
+}
+#grille {
+	display: flex;
+	justify-content: end;
+	align-items: flex-end;
+	height: 50%;
+	border: 1px solid #ccc;
+	background: url('grille.jpg') repeat;
+	box-shadow: inset 0 0 10px #fff;
+}
+#grille p {
+	position: relative;
+	/* background: #333; */
+	/* background: linear-gradient(180deg, #333 0%, #666 50%, #333 100%); */
+	background: linear-gradient(180deg, #333 0%, #333 50%, #666 50%, #666 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	font-size: 2em;
+	padding: 0.6em;
+	/* text-shadow: -1px -1px 0px rgba(255, 255, 255, 0.3), 1px 1px 0px rgba(0, 0, 0, 0.8); */
+}
+/* #grille span {
+	position: relative;
+	margin: -21px 0 0;
+	padding: 0;
+	display: block;
+	background: #111;
+	width: 100%;
+	height: 24px;
+	opacity: 0.25;
+	text-align: center;
+} */
+#tuner {
+	position: relative;
+	overflow: hidden;
+	background-color: #2B1F1D;
+	color: #f9f9f9;
+	padding: 1em;
+	font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+	font-weight: bold;
+	border: 10px solid #513A38;
+}
+#tuner .glass {
+	position: absolute;
+	width: 250px;
+	height: 200px;
+	left: 30vw;
+	top: -50px;
+	display: block;
+	z-index: 2;
+	background: linear-gradient(135deg, rgba(255, 255, 255, 1) 3%, rgba(255, 255, 255, 1) 32%, rgba(255, 255, 255, 0.19) 57%, rgba(255, 255, 255, 0) 63%);
+	opacity: 0.2;
+	transform: rotate(-15deg);
+}
+#tuner strong {
+	font-family: Arial, Helvetica, sans-serif;
+	margin-left: 2em;
+}
+#station, #frequency {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+}
+#station {
+	margin-left: 3em;
+}
+#controls {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-around;
+}
+#bar {
+	font-family: 'Courier New', Courier, monospace;
+	margin-top: 2em;
+	margin-bottom: 2em;
+	overflow: hidden;
+}
+#frequency {
+	margin-left: 2em;
+}
+.link {
+	text-decoration: none;
+	color: inherit;
+}
+
+.led {
+	width: 2em;
+	height: 2em;
+	border-radius: 50%;
+	margin-top: 1em;
+	margin-bottom: 1em;
+	background-color: rgba(255, 255, 255, 0.25);
+	box-shadow: #000 0 -1px 6px 1px;
+}
+.led.red {
+	background-color: #F00;
+	box-shadow: #000 0 -1px 6px 1px, inset #600 0 -1px 8px, #F00 0 3px 11px;
+}
+.led.orange {
+	background-color: #FF7000;
+	box-shadow: #000 0 -1px 6px 1px, inset #630 0 -1px 8px, #FF7000 0 3px 11px;
+}
+
+.led.yellow {
+	background-color: #FF0;
+	box-shadow: #000 0 -1px 6px 1px, inset #660 0 -1px 8px, #FF0 0 3px 11px;
+}
+
+.led.green {
+	background-color: #80FF00;
+	box-shadow: #000 0 -1px 6px 1px, inset #460 0 -1px 8px, #80FF00 0 3px 11px;
+}
