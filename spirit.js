@@ -27,7 +27,8 @@ function noise() {
 	return node;
 }
 // noise.connect(audioContext.destination);
-import {createApp} from 'https://unpkg.com/petite-vue?module';
+// import {createApp} from 'https://unpkg.com/petite-vue?module';
+import {createApp} from '/petite-vue.es.js';
 createApp({
 	number: 6,
 	volume: 50,
