@@ -1,124 +1,82 @@
 [
 	{
-		"name": "93.2 Swadesh FM  Powered by: HamroPatro",
-		"website": "https://swadeshpost.com",
-		"url": "http://216.55.141.189:8653//"
-	},
-	{
-		"name": "The Very Best Of Art Bell (U7Radio.org)",
-		"website": "https://u7radio.org",
-		"url": "http://108.161.128.117:8050//"
-	},
-	{
-		"name": "Radio Quraan",
-		"url": "http://66.45.232.131:9994//"
-	},
-	{
-		"name": "Radio Quran Tafsir",
-		"url": "http://66.45.232.131:9992//"
-	},
-	{
-		"name": "RBN",
-		"website": "https://RepublicBroadcasting.org",
-		"url": "http://cast2.my-control-panel.com:8743//"
-	},
-	{
-		"name": "..:: UMNOE RADIO - УМНОЕ РАДИО ::.. AMG RADIO",
-		"website": "https://volna.top",
-		"url": "https://dirxiph.amgradio.ru/Umnoe?dirxiph"
-	},
-	{
-		"name": "Elijah Radio",
-		"url": "http://usa3-vn.mixstream.net:8016//"
-	},
-	{
-		"name": "..:: SKAZKA FM - СКАЗКА FM ::.. AMG RADIO",
-		"website": "https://volna.top",
-		"url": "https://dirxiph.amgradio.ru/Skazka?dirxiph"
-	},
-	{
-		"name": "Allahu Akbar Radio",
-		"url": "http://66.45.232.131:9996//"
-	},
-	{
-		"name": "KXDJ 98.3",
-		"website": "https://www.kxdjradio.com",
-		"url": "http://96.31.83.94:8168//"
-	},
-	{
-		"name": "WDRU Stream",
-		"url": "http://199.184.153.60:8014//"
-	},
-	{
-		"name": "Govern America Radio Network",
-		"website": "https://governamerica.com",
-		"url": "http://stream.governamerica.com:4030//"
-	},
-	{
-		"name": "RADIO ZOE",
-		"website": "https://www.radiozoe.org",
-		"url": "http://94.23.67.172:9427//"
-	},
-	{
-		"name": "Radio Lampsi Laiko Internet Radio",
-		"website": "https://www.radiolampsi.gr/",
-		"url": "https://i6.streams.ovh:16078//"
-	},
-	{
-		"name": "WSJS STREAM",
-		"url": "http://199.184.153.60:8050//"
-	},
-	{
-		"name": "KUTR Stream",
-		"url": "http://199.184.153.60:8018//"
-	},
-	{
-		"name": "WLES Stream",
-		"url": "http://199.184.153.60:8026//"
-	},
-	{
 		"name": "High Entropy Radio",
-		"url": "https://listen.highentropy.stream/listen/high_entropy_radio/radio.mp3"
+		"website": "https://highentropy.stream/",
+		"url": "https://icecast.highentropy.stream/radio.mp3"
 	},
 	{
-		"name": "Power Of the Cross Radio",
-		"website": "https://www.cross.radio",
-		"url": "http://usa19.fastcast4u.com:1920//"
+		"name": "Palawan Wave FM",
+		"website": "https://radyoph.com/station/palawanwavefm",
+		"url": "https://xcite.radyoph.com:8020/dzrt"
 	},
 	{
-		"name": "Star People",
-		"url": "http://2.139.144.101:8020//"
+		"name": "Radiomundo",
+		"website": "https://enperspectiva.uy/",
+		"url": "https://stream1.enperspectiva.net:8443/radio.mp4"
 	},
 	{
-		"name": "Clonmellon Community Radio",
-		"website": "https://www.clonmelloncommunityradio.com",
-		"url": "http://51.255.235.165:5152//"
+		"name": "Galau Jikan FM - Indonesia",
+		"website": "https://gjfm.my.id/",
+		"url": "https://radio.gjfm.my.id/listen/gjfm/siaran"
 	},
 	{
-		"name": "Radio e Protezione Civile - Domusnovas - Sardegna - Italia",
-		"website": "https://www.radiodomusnovas.it",
-		"url": "http://5.39.82.157:8028//"
+		"name": "90.7 DZSF SMILE Radio",
+		"website": "https://www.youtube.com/@smilenetworkph",
+		"url": "https://audio.cloudrad.io/9a77084c/live"
 	},
 	{
-		"name": "Tjks Radio",
-		"website": "http://tjksradio.com",
-		"url": "http://142.44.136.201:5485//"
+		"name": "Radio Bola",
+		"website": "https://radiostream.novawap.com/",
+		"url": "https://live.radiobola.co.id/listen/radiobola/stream"
 	},
 	{
-		"name": "WTOD Stream",
-		"url": "http://199.184.153.60:8044//"
+		"name": "Radio Broussaille",
+		"website": "https://radiobroussaille.fr/",
+		"url": "https://stream.radiobroussaille.fr:8443/broussaille-hifi"
 	},
 	{
-		"name": "Home Improvement USA",
-		"url": "http://158.69.227.214:8076//"
+		"name": "Radio Trainwreck Live",
+		"website": "https://radiotrainwreck.live/",
+		"url": "https://stream.radiotrainwreck.live/live"
 	},
 	{
-		"name": "Jc Radio",
-		"website": "http://www.jc-radio.de",
-		"url": "https://jcradio.stream.laut.fm/jcradio"
+		"name": "Radyo Natin Madridejos",
+		"website": "https://radyonatinfm.com/madridejos",
+		"url": "https://tx.radyonatinfm.com:8010/madridejos"
 	},
 	{
-		"name": "Hog Radio2000",
-		"url": "https://mira.streamerr.co/listen/hog_radio2000/radio.mp3"
+		"name": "Radyo Natin Iba",
+		"website": "https://radyonatinfm.com/iba",
+		"url": "https://phils.radyonatinfm.com:8000/iba"
+	},
+	{
+		"name": "MIRA Business FM",
+		"website": "https://www.mirabusiness.fm/",
+		"url": "https://radio.mirabusiness.fm:9443/MiraBusinessFM"
+	},
+	{
+		"name": "Radyo Natin BonPen",
+		"website": "https://radyonatinfm.com/bonpen",
+		"url": "https://stream.radyonatinfm.com:8020/bonpen"
+	},
+	{
+		"name": "FIFO Radio",
+		"website": "https://fifo.dulcet.cloud/",
+		"url": "https://stream.dulcet.cloud/fifo"
+	},
+	{
+		"name": "Sober Radio",
+		"website": "https://sober.dulcet.cloud/",
+		"url": "https://stream.dulcet.cloud/sober"
+	},
+	{
+		"name": "Graveyard Radio",
+		"website": "https://graveyard.dulcet.cloud/",
+		"url": "https://stream.dulcet.cloud/graveyard"
+	},
+	{
+		"name": "WALM 2 HD",
+		"website": "https://walmradio.com/walm2",
+		"url": "https://icecast.walmradio.com:8443/walm2"
 	}
 ]
