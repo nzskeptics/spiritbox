@@ -39,29 +39,42 @@
 				<span v-else>&nbsp;</span>
 			</h2>
 			<div id="controls">
-				<div>
-					<div class="led" :class="{red: play}" @click="onPlayClick" title="Play / Stop"></div>
-					<button id="playButton" type='button' @click.prevent="onPlayClick">{{play ? 'Stop' : 'Play'}}</button><!-- style="position: absolute; right: 300px; top: 300px;" -->
+				<div class="control-hero">
+					<div class="transport-group">
+						<div class="led" :class="{red: play}" @click="onPlayClick" title="Play / Stop"></div>
+						<button id="playButton" type='button' @click.prevent="onPlayClick">{{play ? 'Stop' : 'Play'}}</button>
+					</div>
+					<div class="control-group volume-knob-group">
+						<label for="volumeSlider">Volume</label>
+						<div
+							class="volume-dial"
+							:style="{
+								'--dial-fill': ((volume / 100) * 270) + 'deg',
+								'--dial-angle': (((volume / 100) * 270) - 135) + 'deg'
+							}"
+						>
+							<div class="volume-dial-value">{{volume}}%</div>
+						</div>
+						<input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" v-model.number="volume" :title="volume + '%'" @input="updateVolume" @change="updateVolume" />
+					</div>
 				</div>
-				<div class="control-group">
-					<label for="volumeSlider">Volume <span>{{volume}}%</span></label>
-					<input id="volumeSlider" type="range" min="0" max="100" v-model.number="volume" :title="volume + '%'" @input="updateVolume" @change="updateVolume" />
-				</div>
-				<div v-if="allStations?.length" class="control-group">
-					<label for="stationCountSlider">Stations <span>{{number}}</span></label>
-					<input id="stationCountSlider" type="range" min="4" max="16" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
-				</div>
-				<div class="control-group">
-					<label for="switchSlider">Switch <span>{{ms}}ms</span></label>
-					<input id="switchSlider" type="range" min="200" max="1000" step="100" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
-				</div>
-				<div class="control-group">
-					<label for="jitterSlider">Jitter <span>+/-{{jitterMs}}ms</span></label>
-					<input id="jitterSlider" type="range" min="0" max="200" step="5" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
-				</div>
-				<div class="control-group">
-					<label for="staticMixSlider">Static <span>{{staticRatio}}%</span></label>
-					<input id="staticMixSlider" type="range" min="0" max="100" step="5" v-model.number="staticRatio" :title="staticRatio + '%'" />
+				<div class="control-grid">
+					<div v-if="allStations?.length" class="control-group">
+						<label for="stationCountSlider">Stations <span>{{number}}</span></label>
+						<input id="stationCountSlider" type="range" min="4" max="16" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
+					</div>
+					<div class="control-group">
+						<label for="switchSlider">Switch <span>{{ms}}ms</span></label>
+						<input id="switchSlider" type="range" min="200" max="1000" step="100" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
+					</div>
+					<div class="control-group">
+						<label for="jitterSlider">Jitter <span>+/-{{jitterMs}}ms</span></label>
+						<input id="jitterSlider" type="range" min="0" max="200" step="5" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
+					</div>
+					<div class="control-group">
+						<label for="staticMixSlider">Static <span>{{staticRatio}}%</span></label>
+						<input id="staticMixSlider" type="range" min="0" max="100" step="5" v-model.number="staticRatio" :title="staticRatio + '%'" />
+					</div>
 				</div>
 			</div>
 			<div id="audioBank">
