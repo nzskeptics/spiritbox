@@ -2,33 +2,29 @@
 const audioContext = new AudioContext();
 audioContext.createGain();
 const bufferSize = 4096;
-function noise() {
-	const factors = [
-		[0, 0.99886, 0.0555179],
-		[0, 0.96900, 0.0750759],
-		[0, 0.96900, 0.1538520],
-		[0, 0.86650, 0.3104856],
-		[0, 0.55000, 0.5329522],
-		[0, -0.7616, 0.0168980],
-	];
-	var node = audioContext.createScriptProcessor(bufferSize, 1, 1);
+function noise(profile) {
+	const lowpass = profile.lowpass;
+	const hiss = profile.hiss;
+	const crackleChance = profile.crackleChance;
+	let last = 0;
+	const node = audioContext.createScriptProcessor(bufferSize, 1, 1);
 	node.onaudioprocess = function(e) {
 		const output = e.outputBuffer.getChannelData(0);
-		for (var i = 0; i < bufferSize; i++) {
+		for (let i = 0; i < bufferSize; i++) {
 			const white = Math.random() * 2 - 1;
-			for (const factor of factors) {
-				factor[0] = factor[0] * factor[1] + white * factor[2];
+			last = last * lowpass + white * (1 - lowpass);
+			let sample = last * (1 - hiss) + white * hiss;
+			if (Math.random() < crackleChance) {
+				sample += (Math.random() * 2 - 1) * 0.65;
 			}
-			output[i] = factors.reduce((sum, [value]) => sum + value, 0) + white * 0.5362;
-			output[i] *= 0.11;
-			factors[5][0] = white * 0.115926;
+			output[i] = sample;
 		}
 	};
 	return node;
 }
 // noise.connect(audioContext.destination);
 // import {createApp} from 'https://unpkg.com/petite-vue?module';
-import {createApp} from './petite-vue.es.js?v=20261020';
+import {createApp} from './petite-vue.es.js?v=20261021';
 
 const UI_CONFIG = {
 	// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
@@ -45,7 +41,7 @@ const debugEnabled = new URLSearchParams(window.location.search).has('debug')
 	|| ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 console.info('[spirit] script loaded', {
-	version: '20261020',
+	version: '20261021',
 	debugEnabled,
 	host: window.location.host,
 	search: window.location.search,
@@ -57,12 +53,22 @@ createApp({
 	needleMotion: normalizeNeedleMotion(UI_CONFIG.needleMotion),
 	tuneDisplayPercent: 0,
 	needleFrame: null,
+	transitionMs: 220,
+	fadeToken: 0,
+	staticRatio: 20,
+	jitterMs: 50,
+	isStatic: false,
+	staticPosition: 0,
+	staticNode: null,
+	staticFilter: null,
+	staticGain: null,
+	staticLevelFactor: 0.28,
 	number: 6,
 	volume: 50,
 	ms: 300,
 	index: 0,
 	allStations: null,
-	interval: null,
+	retuneTimer: null,
 	play: false,
 	times: [200, 400, 600, 800, 1000],
 	dbg(...args) {
@@ -82,15 +88,17 @@ createApp({
 		return this.allStations?.slice(0, this.number) ?? [];
 	},
 	get station() {
-		if (!this.play) return null;
+		if (!this.play || this.isStatic) return null;
 		return this.stations?.[this.index];
 	},
 	get currentStationNumber() {
+		if (this.isStatic) return 0;
 		return Math.min(this.number, Math.max(1, this.index + 1));
 	},
 	get tunePercent() {
 		if (this.number <= 1) return 0;
-		const clamped = Math.min(this.number - 1, Math.max(0, this.index));
+		const source = this.isStatic ? this.staticPosition : this.index;
+		const clamped = Math.min(this.number - 1, Math.max(0, source));
 		return (clamped / (this.number - 1)) * 100;
 	},
 	get needleMotionClass() {
@@ -137,31 +145,232 @@ createApp({
 	onPlayClick() {
 		this.dbg('play button clicked', {
 			play: this.play,
+			isStatic: this.isStatic,
 			loadedStations: this.allStations?.length ?? 0,
 			activeStations: this.stations.length,
 		});
 		this.playPause();
 	},
+	async ensureAudioContext() {
+		if (audioContext.state !== 'running') {
+			try {
+				await audioContext.resume();
+				this.dbg('audioContext resumed', {state: audioContext.state});
+			} catch (error) {
+				this.dbg('audioContext resume failed', {message: error?.message ?? String(error)});
+			}
+		}
+	},
+	chooseNextIndex() {
+		const count = this.stations.length;
+		let next = Math.floor(Math.random() * count);
+		if (count > 1 && !this.isStatic) {
+			while (next === this.index) {
+				next = Math.floor(Math.random() * count);
+			}
+		}
+		return next;
+	},
+	chooseStaticPosition() {
+		if (this.number <= 1) return 0;
+		const base = Math.floor(Math.random() * (this.number - 1));
+		const between = 0.15 + Math.random() * 0.7;
+		return base + between;
+	},
+	shouldPlayStatic() {
+		if (!this.play || !this.stations.length) return false;
+		if (this.staticRatio <= 0) return false;
+		return Math.random() * 100 < this.staticRatio;
+	},
+	clampVolume(value) {
+		return Math.max(0, Math.min(1, value));
+	},
+	beginTransition() {
+		this.fadeToken += 1;
+		return this.fadeToken;
+	},
+	fadeStation(index, target, durationMs, token) {
+		const audio = this.getAudio(index);
+		if (!audio) return;
+		const to = this.clampVolume(target);
+		const from = audio.muted ? 0 : this.clampVolume(audio.volume);
+		if (Math.abs(from - to) < 0.002) {
+			this.setAudioVolume(index, to);
+			return;
+		}
+		audio.muted = false;
+		if (audio.paused) {
+			const playPromise = audio.play?.();
+			if (playPromise?.catch) {
+				playPromise.catch((error) => {
+					this.dbg('play() rejected', {index, message: error?.message ?? String(error)});
+				});
+			}
+		}
+		const start = performance.now();
+		const step = (now) => {
+			if (token !== this.fadeToken) return;
+			const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
+			const eased = t * (2 - t);
+			const value = this.clampVolume(from + (to - from) * eased);
+			audio.volume = value;
+			audio.muted = value <= 0.001;
+			if (t < 1) {
+				requestAnimationFrame(step);
+			}
+		};
+		requestAnimationFrame(step);
+	},
+	fadeStaticGain(target, durationMs, token, stopWhenSilent = false) {
+		if (!this.staticGain) return;
+		const to = this.clampVolume(target);
+		const from = this.clampVolume(this.staticGain.gain.value || 0);
+		if (Math.abs(from - to) < 0.002) {
+			this.staticGain.gain.value = to;
+			if (stopWhenSilent && to <= 0.001 && token === this.fadeToken) this.stopStatic();
+			return;
+		}
+		const start = performance.now();
+		const step = (now) => {
+			if (token !== this.fadeToken) return;
+			const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
+			const eased = t * (2 - t);
+			this.staticGain.gain.value = this.clampVolume(from + (to - from) * eased);
+			if (t < 1) {
+				requestAnimationFrame(step);
+				return;
+			}
+			if (stopWhenSilent && this.staticGain.gain.value <= 0.001 && token === this.fadeToken) {
+				this.stopStatic();
+			}
+		};
+		requestAnimationFrame(step);
+	},
+	staticTargetGain() {
+		return this.clampVolume((this.volume / 100) * this.staticLevelFactor);
+	},
+	retuneStaticTexture() {
+		if (!this.staticFilter) return;
+		const now = audioContext.currentTime;
+		const targetFrequency = 980 + (Math.random() - 0.5) * 220;
+		const targetQ = 0.85 + Math.random() * 0.45;
+		this.staticFilter.frequency.setTargetAtTime(targetFrequency, now, 0.06);
+		this.staticFilter.Q.setTargetAtTime(targetQ, now, 0.08);
+		this.staticLevelFactor = Math.max(0.24, Math.min(0.32, this.staticLevelFactor + (Math.random() - 0.5) * 0.03));
+	},
+	startStatic() {
+		if (this.staticNode && this.staticFilter && this.staticGain) return;
+		const profile = {
+			lowpass: 0.89 + Math.random() * 0.04,
+			hiss: 0.31 + Math.random() * 0.12,
+			crackleChance: 0.001 + Math.random() * 0.0025,
+		};
+		const node = noise(profile);
+		const filter = audioContext.createBiquadFilter();
+		filter.type = 'bandpass';
+		filter.frequency.value = 980;
+		filter.Q.value = 1.0;
+		const gain = audioContext.createGain();
+		gain.gain.value = 0;
+		node.connect(filter);
+		filter.connect(gain);
+		gain.connect(audioContext.destination);
+		this.staticNode = node;
+		this.staticFilter = filter;
+		this.staticGain = gain;
+		this.staticLevelFactor = 0.27 + Math.random() * 0.04;
+		this.dbg('static started', {
+			profile,
+			filterType: filter.type,
+			frequency: filter.frequency.value,
+			gain: gain.gain.value,
+			levelFactor: this.staticLevelFactor,
+		});
+	},
+	stopStatic() {
+		if (this.staticNode) {
+			try {
+				this.staticNode.disconnect();
+			} catch {}
+		}
+		if (this.staticFilter) {
+			try {
+				this.staticFilter.disconnect();
+			} catch {}
+		}
+		if (this.staticGain) {
+			try {
+				this.staticGain.disconnect();
+			} catch {}
+		}
+		this.staticNode = null;
+		this.staticFilter = null;
+		this.staticGain = null;
+	},
+	playStatic() {
+		const token = this.beginTransition();
+		this.isStatic = true;
+		this.staticPosition = this.chooseStaticPosition();
+		this.syncNeedle();
+		this.startStatic();
+		this.retuneStaticTexture();
+		for (const i of this.stations.keys()) {
+			this.fadeStation(i, 0, this.transitionMs, token);
+		}
+		this.fadeStaticGain(this.staticTargetGain(), this.transitionMs, token);
+	},
+	playStation(index) {
+		const token = this.beginTransition();
+		const targetVolume = this.clampVolume(this.volume / 100);
+		this.isStatic = false;
+		this.index = index;
+		this.syncNeedle();
+		for (const i of this.stations.keys()) {
+			this.fadeStation(i, i === index ? targetVolume : 0, this.transitionMs, token);
+		}
+		this.fadeStaticGain(0, this.transitionMs, token, true);
+	},
+	playNextSelection() {
+		if (this.shouldPlayStatic()) {
+			this.dbg('retune selection', {mode: 'static', ratio: this.staticRatio});
+			this.playStatic();
+			return;
+		}
+		const next = this.chooseNextIndex();
+		this.dbg('retune selection', {mode: 'station', index: next, ratio: this.staticRatio});
+		this.playStation(next);
+	},
+	nextRetuneDelay() {
+		const jitter = Math.max(0, Number(this.jitterMs) || 0);
+		const min = Math.max(50, this.ms - jitter);
+		const max = this.ms + jitter;
+		return Math.floor(min + Math.random() * (max - min + 1));
+	},
+	scheduleRetuneTick() {
+		if (!this.play || !this.stations.length) return;
+		const delay = this.nextRetuneDelay();
+		this.retuneTimer = setTimeout(() => {
+			this.playNextSelection();
+			this.dbg('retune tick', {
+				delay,
+				isStatic: this.isStatic,
+				index: this.index,
+				name: this.station?.name,
+				url: this.station?.url,
+				staticPosition: this.staticPosition,
+			});
+			this.scheduleRetuneTick();
+		}, delay);
+	},
 	retune() {
-		clearInterval(this.interval);
+		clearTimeout(this.retuneTimer);
+		this.retuneTimer = null;
 		if (!this.play || !this.stations.length) {
 			this.dbg('retune skipped', {play: this.play, stations: this.stations.length});
 			return;
 		}
-		this.dbg('retune started', {ms: this.ms, stations: this.stations.length});
-		this.interval = setInterval(() => {
-			const count = this.stations.length;
-			let next = Math.floor(Math.random() * count);
-			if (count > 1) {
-				while (next === this.index) {
-					next = Math.floor(Math.random() * count);
-				}
-			}
-			this.index = next;
-			this.syncNeedle();
-			this.dbg('retune tick', {index: this.index, name: this.station?.name, url: this.station?.url});
-			this.unmute(this.index);
-		}, this.ms);
+		this.dbg('retune started', {ms: this.ms, jitterMs: this.jitterMs, stations: this.stations.length, mode: 'randomized'});
+		this.scheduleRetuneTick();
 	},
 	getAudio(index) {
 		return document.querySelector(`#audioBank audio[data-audio-index="${index}"]`);
@@ -213,6 +422,8 @@ createApp({
 	},
 	stopAllStreams() {
 		this.dbg('stopAllStreams', {count: this.number});
+		this.stopStatic();
+		this.isStatic = false;
 		for (let i = 0; i < this.number; i++) {
 			const audio = this.getAudio(i);
 			if (!audio) continue;
@@ -235,7 +446,14 @@ createApp({
 	updateVolume() {
 		if (!this.play) return;
 		this.dbg('volume changed', {volume: this.volume, index: this.index});
-		this.unmute(this.index);
+		const token = this.beginTransition();
+		if (this.isStatic && this.staticGain) {
+			this.fadeStaticGain(this.staticTargetGain(), 120, token);
+			return;
+		}
+		for (const i of this.stations.keys()) {
+			this.fadeStation(i, i === this.index ? this.clampVolume(this.volume / 100) : 0, 120, token);
+		}
 	},
 	updateStationCount() {
 		const stationCount = Math.min(this.number, this.allStations?.length ?? 0);
@@ -246,7 +464,11 @@ createApp({
 		if (this.play) {
 			queueMicrotask(() => {
 				this.startAllStreams();
-				this.unmute(this.index);
+				if (this.isStatic) {
+					this.playStatic();
+				} else {
+					this.unmute(this.index);
+				}
 			});
 		}
 		this.retune();
@@ -260,8 +482,8 @@ createApp({
 		if (!this.allStations?.length) return;
 		if (this.play) {
 			this.dbg('playPause -> stop');
-			clearInterval(this.interval);
-			this.interval = null;
+			clearTimeout(this.retuneTimer);
+			this.retuneTimer = null;
 			this.stopAllStreams();
 			this.play = false;
 			return;
@@ -270,8 +492,9 @@ createApp({
 		this.play = true;
 		this.shuffle();
 		queueMicrotask(() => {
+			this.ensureAudioContext();
 			this.startAllStreams();
-			this.unmute(this.index);
+			this.playNextSelection();
 			this.retune();
 		});
 	},
@@ -292,11 +515,11 @@ createApp({
 					play: this.play,
 					index: this.index,
 					stations: this.stations.length,
-					intervalActive: !!this.interval,
+					retuneActive: !!this.retuneTimer,
 				});
 			}, 2000);
 		}
-		fetch("./stations.json?v=20261020")
+		fetch("./stations.json?v=20261021")
 			.then((response) => response.json())
 			.then((json) => {
 				this.allStations = json;

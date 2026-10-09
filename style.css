@@ -264,29 +264,33 @@ form::before {
 	text-shadow: 0 0 6px rgba(251, 220, 145, 0.22);
 }
 
-h2 {
+.station-title {
 	margin: 0;
 	padding: 0.2rem 0.35rem;
+	min-height: 1.9rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	text-align: center;
 	font-size: clamp(1rem, 2vw, 1.35rem);
 	letter-spacing: 0.03em;
 	font-family: Georgia, "Times New Roman", serif;
 }
 
-h2 a {
+.station-title a {
 	color: #f4dcaa;
 	text-decoration: none;
 	border-bottom: 1px dashed rgba(244, 220, 170, 0.5);
 	transition: color 120ms ease;
 }
 
-h2 a:hover {
+.station-title a:hover {
 	color: #ffe6b8;
 }
 
 #controls {
 	display: grid;
-	grid-template-columns: auto minmax(130px, 1fr) minmax(130px, 1fr) minmax(130px, 1fr);
+	grid-template-columns: auto repeat(5, minmax(120px, 1fr));
 	gap: 0.8rem;
 	align-items: center;
 	padding: 0.75rem;
