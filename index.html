@@ -5,7 +5,7 @@
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<link rel="stylesheet" href="./reset.min.css" />
-		<script type="module" src="./spirit.js?v=20261021"></script>
+		<script type="module" src="./spirit.js?v=20261027"></script>
 		<link rel="stylesheet" href="./style.css">
 		<title>Spirit Box</title>
 	</head>
@@ -64,16 +64,16 @@
 						<input id="stationCountSlider" type="range" min="4" max="16" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
 					</div>
 					<div class="control-group">
-						<label for="switchSlider">Switch <span>{{ms}}ms</span></label>
+						<label for="switchSlider">Hop <span>{{ms}}ms</span></label>
 						<input id="switchSlider" type="range" min="200" max="1000" step="100" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
-					</div>
-					<div class="control-group">
-						<label for="jitterSlider">Jitter <span>+/-{{jitterMs}}ms</span></label>
-						<input id="jitterSlider" type="range" min="0" max="200" step="5" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
 					</div>
 					<div class="control-group">
 						<label for="staticMixSlider">Static <span>{{staticRatio}}%</span></label>
 						<input id="staticMixSlider" type="range" min="0" max="100" step="5" v-model.number="staticRatio" :title="staticRatio + '%'" />
+					</div>
+					<div class="control-group">
+						<label for="jitterSlider">Jitter <span>+/-{{jitterMs}}ms</span></label>
+						<input id="jitterSlider" type="range" min="0" max="200" step="5" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
 					</div>
 				</div>
 			</div>

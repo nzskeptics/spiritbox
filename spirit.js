@@ -24,11 +24,20 @@ function noise(profile) {
 }
 // noise.connect(audioContext.destination);
 // import {createApp} from 'https://unpkg.com/petite-vue?module';
-import {createApp} from './petite-vue.es.js?v=20261021';
+import {createApp} from './petite-vue.es.js?v=20261027';
+import {RADIO_BROWSER_API_BASE, fetchRadioBrowserStationsWithFailover} from './radioBrowserApi.mjs';
 
 const UI_CONFIG = {
 	// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
 	needleMotion: 'analog',
+	transitions: {
+		// Crossfades for different mode switches.
+		stationToStationMs: 520,
+		stationToStaticMs: 720,
+		staticToStationMs: 880,
+		volumeRampMs: 180,
+		keepStaticEngineWarm: true,
+	},
 };
 
 function normalizeNeedleMotion(value) {
@@ -36,24 +45,31 @@ function normalizeNeedleMotion(value) {
 	return 'analog';
 }
 
-const debugEnabled = new URLSearchParams(window.location.search).has('debug')
-	|| localStorage.getItem('spiritDebug') === '1'
-	|| ['localhost', '127.0.0.1'].includes(window.location.hostname);
-
-console.info('[spirit] script loaded', {
-	version: '20261021',
-	debugEnabled,
-	host: window.location.host,
-	search: window.location.search,
-	needleMotion: normalizeNeedleMotion(UI_CONFIG.needleMotion),
-});
+async function getStationsFromRadioBrowser() {
+	const result = await fetchRadioBrowserStationsWithFailover({
+		bases: [RADIO_BROWSER_API_BASE],
+		limit: 200,
+		offset: 0,
+		timeoutMs: 10000,
+		retries: 2,
+		retryDelayMs: 350,
+	});
+	const stations = result.stations;
+	if (!stations.length) {
+		throw new Error('No compatible stations returned');
+	}
+	return {stations, source: `radio-browser:${RADIO_BROWSER_API_BASE}`};
+}
 
 createApp({
-	debug: debugEnabled,
 	needleMotion: normalizeNeedleMotion(UI_CONFIG.needleMotion),
 	tuneDisplayPercent: 0,
 	needleFrame: null,
-	transitionMs: 300,
+	stationToStationMs: UI_CONFIG.transitions.stationToStationMs,
+	stationToStaticMs: UI_CONFIG.transitions.stationToStaticMs,
+	staticToStationMs: UI_CONFIG.transitions.staticToStationMs,
+	volumeRampMs: UI_CONFIG.transitions.volumeRampMs,
+	keepStaticEngineWarm: UI_CONFIG.transitions.keepStaticEngineWarm,
 	fadeToken: 0,
 	staticRatio: 50,
 	jitterMs: 50,
@@ -71,9 +87,33 @@ createApp({
 	retuneTimer: null,
 	play: false,
 	times: [200, 400, 600, 800, 1000],
-	dbg(...args) {
-		if (!this.debug) return;
-		console.log('[spirit]', ...args);
+	applyStations(stations, source) {
+		this.allStations = stations;
+		if (this.number > this.allStations.length) {
+			this.number = this.allStations.length;
+		}
+		this.syncNeedle();
+	},
+	async loadStations() {
+		const preferFile = new URLSearchParams(window.location.search).get('source') === 'file';
+		if (!preferFile) {
+			try {
+				const remote = await getStationsFromRadioBrowser();
+				this.applyStations(remote.stations, remote.source);
+				return;
+			} catch (error) {}
+		}
+		try {
+			const response = await fetch('./stations.json?v=20261027');
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}`);
+			}
+			const json = await response.json();
+			this.applyStations(json, 'stations.json');
+		} catch (error) {
+			console.error('Failed to load stations from remote API and stations.json', error);
+			this.allStations = [];
+		}
 	},
 	get stationDigits() {
 		return Array.from({length: this.number}, (_, i) => i + 1);
@@ -143,22 +183,13 @@ createApp({
 		this.needleFrame = requestAnimationFrame(step);
 	},
 	onPlayClick() {
-		this.dbg('play button clicked', {
-			play: this.play,
-			isStatic: this.isStatic,
-			loadedStations: this.allStations?.length ?? 0,
-			activeStations: this.stations.length,
-		});
 		this.playPause();
 	},
 	async ensureAudioContext() {
 		if (audioContext.state !== 'running') {
 			try {
 				await audioContext.resume();
-				this.dbg('audioContext resumed', {state: audioContext.state});
-			} catch (error) {
-				this.dbg('audioContext resume failed', {message: error?.message ?? String(error)});
-			}
+			} catch (error) {}
 		}
 	},
 	chooseNextIndex() {
@@ -202,9 +233,7 @@ createApp({
 		if (audio.paused) {
 			const playPromise = audio.play?.();
 			if (playPromise?.catch) {
-				playPromise.catch((error) => {
-					this.dbg('play() rejected', {index, message: error?.message ?? String(error)});
-				});
+				playPromise.catch(() => {});
 			}
 		}
 		const start = performance.now();
@@ -279,13 +308,6 @@ createApp({
 		this.staticFilter = filter;
 		this.staticGain = gain;
 		this.staticLevelFactor = 0.27 + Math.random() * 0.04;
-		this.dbg('static started', {
-			profile,
-			filterType: filter.type,
-			frequency: filter.frequency.value,
-			gain: gain.gain.value,
-			levelFactor: this.staticLevelFactor,
-		});
 	},
 	stopStatic() {
 		if (this.staticNode) {
@@ -308,36 +330,42 @@ createApp({
 		this.staticGain = null;
 	},
 	playStatic() {
+		const wasStatic = this.isStatic;
 		const token = this.beginTransition();
 		this.isStatic = true;
 		this.staticPosition = this.chooseStaticPosition();
 		this.syncNeedle();
 		this.startStatic();
 		this.retuneStaticTexture();
+		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.stationToStaticMs * 0.7)) : this.stationToStaticMs;
 		for (const i of this.stations.keys()) {
-			this.fadeStation(i, 0, this.transitionMs, token);
+			this.fadeStation(i, 0, fadeMs, token);
 		}
-		this.fadeStaticGain(this.staticTargetGain(), this.transitionMs, token);
+		this.fadeStaticGain(this.staticTargetGain(), fadeMs, token);
 	},
 	playStation(index) {
+		const wasStatic = this.isStatic;
 		const token = this.beginTransition();
 		const targetVolume = this.clampVolume(this.volume / 100);
 		this.isStatic = false;
 		this.index = index;
 		this.syncNeedle();
+		const fadeMs = wasStatic ? this.staticToStationMs : this.stationToStationMs;
 		for (const i of this.stations.keys()) {
-			this.fadeStation(i, i === index ? targetVolume : 0, this.transitionMs, token);
+			this.fadeStation(i, i === index ? targetVolume : 0, fadeMs, token);
 		}
-		this.fadeStaticGain(0, this.transitionMs, token, true);
+		if (wasStatic) {
+			this.fadeStaticGain(0, fadeMs, token, !this.keepStaticEngineWarm);
+		} else {
+			this.fadeStaticGain(0, this.stationToStationMs, token, !this.keepStaticEngineWarm);
+		}
 	},
 	playNextSelection() {
 		if (this.shouldPlayStatic()) {
-			this.dbg('retune selection', {mode: 'static', ratio: this.staticRatio});
 			this.playStatic();
 			return;
 		}
 		const next = this.chooseNextIndex();
-		this.dbg('retune selection', {mode: 'station', index: next, ratio: this.staticRatio});
 		this.playStation(next);
 	},
 	nextRetuneDelay() {
@@ -351,14 +379,6 @@ createApp({
 		const delay = this.nextRetuneDelay();
 		this.retuneTimer = setTimeout(() => {
 			this.playNextSelection();
-			this.dbg('retune tick', {
-				delay,
-				isStatic: this.isStatic,
-				index: this.index,
-				name: this.station?.name,
-				url: this.station?.url,
-				staticPosition: this.staticPosition,
-			});
 			this.scheduleRetuneTick();
 		}, delay);
 	},
@@ -366,10 +386,8 @@ createApp({
 		clearTimeout(this.retuneTimer);
 		this.retuneTimer = null;
 		if (!this.play || !this.stations.length) {
-			this.dbg('retune skipped', {play: this.play, stations: this.stations.length});
 			return;
 		}
-		this.dbg('retune started', {ms: this.ms, jitterMs: this.jitterMs, stations: this.stations.length, mode: 'randomized'});
 		this.scheduleRetuneTick();
 	},
 	getAudio(index) {
@@ -378,50 +396,23 @@ createApp({
 	setAudioVolume(index, value) {
 		const audio = this.getAudio(index);
 		if (!audio) {
-			this.dbg('audio ref missing', {index, value});
 			return;
 		}
 		audio.muted = value === 0;
 		audio.volume = value;
-		this.dbg('set volume', {index, value, paused: audio.paused});
 		if (audio.paused) {
 			const playPromise = audio.play?.();
 			if (playPromise?.catch) {
-				playPromise.catch((error) => {
-					this.dbg('play() rejected', {index, message: error?.message ?? String(error)});
-				});
+				playPromise.catch(() => {});
 			}
 		}
 	},
 	startAllStreams() {
-		this.dbg('startAllStreams', {count: this.stations.length});
 		for (const i of this.stations.keys()) {
 			this.setAudioVolume(i, 0);
 		}
-		this.attachAudioDebugListeners();
-	},
-	attachAudioDebugListeners() {
-		if (!this.debug) return;
-		for (const i of this.stations.keys()) {
-			const audio = this.getAudio(i);
-			if (!audio || audio.dataset.debugWired === '1') continue;
-			audio.dataset.debugWired = '1';
-			for (const eventName of ['playing', 'pause', 'stalled', 'waiting', 'error', 'canplay']) {
-				audio.addEventListener(eventName, () => {
-					this.dbg('audio event', {
-						event: eventName,
-						index: i,
-						src: audio.currentSrc || audio.src,
-						readyState: audio.readyState,
-						networkState: audio.networkState,
-						error: audio.error?.message || audio.error?.code || null,
-					});
-				});
-			}
-		}
 	},
 	stopAllStreams() {
-		this.dbg('stopAllStreams', {count: this.number});
 		this.stopStatic();
 		this.isStatic = false;
 		for (let i = 0; i < this.number; i++) {
@@ -434,30 +425,26 @@ createApp({
 	},
 	unmute(index) {
 		if (!this.play || !this.stations.length) {
-			this.dbg('unmute skipped', {play: this.play, stations: this.stations.length});
 			return;
 		}
 		for (const i of this.stations.keys()) {
 			this.setAudioVolume(i, 0);
 		}
-		this.dbg('unmute index', {index, name: this.stations[index]?.name, url: this.stations[index]?.url, volume: this.volume});
 		this.setAudioVolume(index, this.volume / 100);
 	},
 	updateVolume() {
 		if (!this.play) return;
-		this.dbg('volume changed', {volume: this.volume, index: this.index});
 		const token = this.beginTransition();
 		if (this.isStatic && this.staticGain) {
-			this.fadeStaticGain(this.staticTargetGain(), 120, token);
+			this.fadeStaticGain(this.staticTargetGain(), this.volumeRampMs, token);
 			return;
 		}
 		for (const i of this.stations.keys()) {
-			this.fadeStation(i, i === this.index ? this.clampVolume(this.volume / 100) : 0, 120, token);
+			this.fadeStation(i, i === this.index ? this.clampVolume(this.volume / 100) : 0, this.volumeRampMs, token);
 		}
 	},
 	updateStationCount() {
 		const stationCount = Math.min(this.number, this.allStations?.length ?? 0);
-		this.dbg('station count changed', {number: this.number, stationCount});
 		if (!stationCount) return;
 		if (this.index >= stationCount) this.index = 0;
 		this.syncNeedle();
@@ -476,19 +463,16 @@ createApp({
 	shuffle() {
 		if (!this.allStations?.length) return;
 		this.allStations = this.allStations.sort(() => Math.random() - 0.5);
-		this.dbg('stations shuffled', {count: this.allStations.length});
 	},
 	playPause() {
 		if (!this.allStations?.length) return;
 		if (this.play) {
-			this.dbg('playPause -> stop');
 			clearTimeout(this.retuneTimer);
 			this.retuneTimer = null;
 			this.stopAllStreams();
 			this.play = false;
 			return;
 		}
-		this.dbg('playPause -> play', {stations: this.stations.length, ms: this.ms, volume: this.volume});
 		this.play = true;
 		this.shuffle();
 		queueMicrotask(() => {
@@ -499,46 +483,7 @@ createApp({
 		});
 	},
 	mounted() {
-		this.dbg('mounted', {debug: this.debug, hint: 'Use ?debug in URL or localStorage.spiritDebug=1'});
 		this.syncNeedle();
-		if (this.debug) {
-			window.addEventListener('click', (event) => {
-				const target = event.target;
-				this.dbg('window click', {
-					tag: target?.tagName,
-					id: target?.id || null,
-					className: target?.className || null,
-				});
-			});
-			setInterval(() => {
-				this.dbg('heartbeat', {
-					play: this.play,
-					index: this.index,
-					stations: this.stations.length,
-					retuneActive: !!this.retuneTimer,
-				});
-			}, 2000);
-		}
-		fetch("./stations.json?v=20261021")
-			.then((response) => response.json())
-			.then((json) => {
-				this.allStations = json;
-				this.dbg('stations loaded', {count: this.allStations.length});
-				const playButton = document.getElementById('playButton');
-				if (playButton && this.debug) {
-					playButton.addEventListener('click', () => {
-						this.dbg('native play button click observed');
-					});
-				}
-				if (this.number > this.allStations.length) {
-					this.number = this.allStations.length;
-				}
-				this.syncNeedle();
-			})
-			.catch((error) => {
-				console.error('Failed to load stations.json', error);
-				this.dbg('stations load failed', {message: error?.message ?? String(error)});
-				this.allStations = [];
-			});
+		this.loadStations();
 	},
 }).mount();

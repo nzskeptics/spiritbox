@@ -14,13 +14,15 @@ const DEFAULTS = {
 	pageSize: 200,
 };
 
-const RADIO_BROWSER_BASES = [
-	'https://de1.api.radio-browser.info/json',
-	'https://nl1.api.radio-browser.info/json',
-	'https://fr1.api.radio-browser.info/json',
-];
-
 const USER_AGENT = 'spiritbox-station-grabber/1.0 (+https://github.com/nzskeptics/spiritbox)';
+let radioBrowserApiPromise = null;
+
+function getSharedRadioBrowserApi() {
+	if (!radioBrowserApiPromise) {
+		radioBrowserApiPromise = import('./radioBrowserApi.mjs');
+	}
+	return radioBrowserApiPromise;
+}
 
 function getArgValue(name) {
 	const prefix = `--${name}=`;
@@ -86,6 +88,7 @@ function shuffle(array) {
 }
 
 async function getRadioBrowserServers() {
+	const sharedApi = await getSharedRadioBrowserApi();
 	try {
 		const srv = await dns.resolveSrv('_api._tcp.radio-browser.info');
 		const hosts = srv.map((record) => record.name).filter(Boolean);
@@ -110,7 +113,7 @@ async function getRadioBrowserServers() {
 		}
 	} catch {}
 
-	return shuffle(RADIO_BROWSER_BASES);
+	return [sharedApi.RADIO_BROWSER_API_BASE];
 }
 
 async function checkStation(station, options) {
@@ -146,38 +149,26 @@ async function checkStation(station, options) {
 }
 
 async function getStationsBatch(offset, pageSize, serverBases) {
-	let lastError = null;
-	for (const base of serverBases) {
-		try {
-			const url = `${base}/stations/search`;
-			const response = await axios.get(url, {
-				params: {
-					hidebroken: 'true',
-					has_extended_info: 'true',
-					tag: 'talk',
-					order: 'votes',
-					reverse: 'true',
-					limit: pageSize,
-					offset,
-				},
-				headers: {'User-Agent': USER_AGENT},
-				timeout: 15000,
-			});
-
-			return response.data
-				.filter((station) => station && station.url_resolved)
-				.filter((station) => ['mp3', 'aac', 'aac+'].includes((station.codec || '').toLowerCase()))
-				.map((station) => ({
-					name: station.name,
-					website: station.homepage || station.url || station.url_resolved,
-					url: station.url_resolved,
-				}));
-		} catch (error) {
-			lastError = error;
+	const sharedApi = await getSharedRadioBrowserApi();
+	const result = await sharedApi.fetchRadioBrowserStationsWithFailover({
+		bases: serverBases,
+		limit: pageSize,
+		offset,
+		timeoutMs: 15000,
+		retries: 1,
+		retryDelayMs: 300,
+		requestInit: {
+			headers: {
+				accept: 'application/json',
+				'User-Agent': USER_AGENT,
+			},
+		},
+		onMirrorError(error, base) {
 			console.log(`Radio Browser mirror failed: ${base}`);
-		}
-	}
-	throw lastError || new Error('No Radio Browser mirror available');
+		},
+	});
+
+	return result.stations;
 }
 
 async function getStationsFromInternetRadio(pageNumber) {
