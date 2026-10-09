@@ -145,7 +145,7 @@ createApp({
 		clearTimeout(this.retuneTimer);
 		this.retuneTimer = null;
 	},
-	applyStations(stations, source) {
+	applyStations(stations) {
 		this.allStations = stations;
 		if (this.number > this.allStations.length) {
 			this.number = this.allStations.length;
@@ -157,7 +157,7 @@ createApp({
 		if (!preferFile) {
 			try {
 				const remote = await getStationsFromRadioBrowser();
-				this.applyStations(remote.stations, remote.source);
+				this.applyStations(remote.stations);
 				return;
 			} catch (error) {
 				console.warn('Remote station load failed, falling back to stations.json:', error?.message || error);
@@ -169,7 +169,7 @@ createApp({
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const json = await response.json();
-			this.applyStations(json, 'stations.json');
+			this.applyStations(json);
 		} catch (error) {
 			console.error('Failed to load stations from remote API and stations.json', error);
 			this.allStations = [];
