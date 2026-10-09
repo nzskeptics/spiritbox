@@ -28,8 +28,20 @@ function noise() {
 }
 // noise.connect(audioContext.destination);
 // import {createApp} from 'https://unpkg.com/petite-vue?module';
-import {createApp} from '/petite-vue.es.js';
+import {createApp} from './petite-vue.es.js?v=20261018';
+const debugEnabled = new URLSearchParams(window.location.search).has('debug')
+	|| localStorage.getItem('spiritDebug') === '1'
+	|| ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+console.info('[spirit] script loaded', {
+	version: '20261018',
+	debugEnabled,
+	host: window.location.host,
+	search: window.location.search,
+});
+
 createApp({
+	debug: debugEnabled,
 	number: 6,
 	volume: 50,
 	ms: 300,
@@ -38,43 +50,204 @@ createApp({
 	interval: null,
 	play: false,
 	times: [200, 400, 600, 800, 1000],
+	dbg(...args) {
+		if (!this.debug) return;
+		console.log('[spirit]', ...args);
+	},
+	get stationDigits() {
+		return Array.from({length: this.number}, (_, i) => i + 1);
+	},
+	get barPrimary() {
+		return '|'.repeat(512);
+	},
+	get barSecondary() {
+		return Array.from({length: 64}, () => '....|').join('') + '....';
+	},
 	get stations() {
-		if (this.play) return this.allStations?.slice(0, this.number);
-		return [];
+		return this.allStations?.slice(0, this.number) ?? [];
 	},
 	get station() {
+		if (!this.play) return null;
 		return this.stations?.[this.index];
+	},
+	onPlayClick() {
+		this.dbg('play button clicked', {
+			play: this.play,
+			loadedStations: this.allStations?.length ?? 0,
+			activeStations: this.stations.length,
+		});
+		this.playPause();
 	},
 	retune() {
 		clearInterval(this.interval);
-		if (this.play) this.interval = setInterval(() => {
-			this.index = Math.floor(Math.random() * this.number);
+		if (!this.play || !this.stations.length) {
+			this.dbg('retune skipped', {play: this.play, stations: this.stations.length});
+			return;
+		}
+		this.dbg('retune started', {ms: this.ms, stations: this.stations.length});
+		this.interval = setInterval(() => {
+			const count = this.stations.length;
+			let next = Math.floor(Math.random() * count);
+			if (count > 1) {
+				while (next === this.index) {
+					next = Math.floor(Math.random() * count);
+				}
+			}
+			this.index = next;
+			this.dbg('retune tick', {index: this.index, name: this.station?.name, url: this.station?.url});
 			this.unmute(this.index);
 		}, this.ms);
 	},
-	unmute(index) {
-		console.log(this.$refs['audio0']);
-		for (const i of this.stations.keys()) {
-			// this.$refs['audio-' + i][0].muted = true;
-			this.$refs['audio' + i].volume = 0;
+	getAudio(index) {
+		return document.querySelector(`#audioBank audio[data-audio-index="${index}"]`);
+	},
+	setAudioVolume(index, value) {
+		const audio = this.getAudio(index);
+		if (!audio) {
+			this.dbg('audio ref missing', {index, value});
+			return;
 		}
-		// this.$refs['audio-' + index][0].muted = false;
-		this.$refs['audio' + index].volume = this.volume / 100;
+		audio.muted = value === 0;
+		audio.volume = value;
+		this.dbg('set volume', {index, value, paused: audio.paused});
+		if (audio.paused) {
+			const playPromise = audio.play?.();
+			if (playPromise?.catch) {
+				playPromise.catch((error) => {
+					this.dbg('play() rejected', {index, message: error?.message ?? String(error)});
+				});
+			}
+		}
 	},
-	shuffle() {
-		this.allStations = this.allStations.sort(() => Math.random() - 0.5);
+	startAllStreams() {
+		this.dbg('startAllStreams', {count: this.stations.length});
+		for (const i of this.stations.keys()) {
+			this.setAudioVolume(i, 0);
+		}
+		this.attachAudioDebugListeners();
 	},
-	playPause() {
-		this.play = !this.play;
+	attachAudioDebugListeners() {
+		if (!this.debug) return;
+		for (const i of this.stations.keys()) {
+			const audio = this.getAudio(i);
+			if (!audio || audio.dataset.debugWired === '1') continue;
+			audio.dataset.debugWired = '1';
+			for (const eventName of ['playing', 'pause', 'stalled', 'waiting', 'error', 'canplay']) {
+				audio.addEventListener(eventName, () => {
+					this.dbg('audio event', {
+						event: eventName,
+						index: i,
+						src: audio.currentSrc || audio.src,
+						readyState: audio.readyState,
+						networkState: audio.networkState,
+						error: audio.error?.message || audio.error?.code || null,
+					});
+				});
+			}
+		}
+	},
+	stopAllStreams() {
+		this.dbg('stopAllStreams', {count: this.number});
+		for (let i = 0; i < this.number; i++) {
+			const audio = this.getAudio(i);
+			if (!audio) continue;
+			audio.muted = true;
+			audio.volume = 0;
+			audio.pause?.();
+		}
+	},
+	unmute(index) {
+		if (!this.play || !this.stations.length) {
+			this.dbg('unmute skipped', {play: this.play, stations: this.stations.length});
+			return;
+		}
+		for (const i of this.stations.keys()) {
+			this.setAudioVolume(i, 0);
+		}
+		this.dbg('unmute index', {index, name: this.stations[index]?.name, url: this.stations[index]?.url, volume: this.volume});
+		this.setAudioVolume(index, this.volume / 100);
+	},
+	updateVolume() {
+		if (!this.play) return;
+		this.dbg('volume changed', {volume: this.volume, index: this.index});
+		this.unmute(this.index);
+	},
+	updateStationCount() {
+		const stationCount = Math.min(this.number, this.allStations?.length ?? 0);
+		this.dbg('station count changed', {number: this.number, stationCount});
+		if (!stationCount) return;
+		if (this.index >= stationCount) this.index = 0;
 		if (this.play) {
-			this.shuffle();
-			this.unmute(this.index);
+			queueMicrotask(() => {
+				this.startAllStreams();
+				this.unmute(this.index);
+			});
 		}
 		this.retune();
 	},
-	mounted() {
-		fetch("stations.json")
-			.then((response) => response.json())
-			.then((json) => this.allStations = json);
+	shuffle() {
+		if (!this.allStations?.length) return;
+		this.allStations = this.allStations.sort(() => Math.random() - 0.5);
+		this.dbg('stations shuffled', {count: this.allStations.length});
 	},
-}).mount('form');
+	playPause() {
+		if (!this.allStations?.length) return;
+		if (this.play) {
+			this.dbg('playPause -> stop');
+			clearInterval(this.interval);
+			this.interval = null;
+			this.stopAllStreams();
+			this.play = false;
+			return;
+		}
+		this.dbg('playPause -> play', {stations: this.stations.length, ms: this.ms, volume: this.volume});
+		this.play = true;
+		this.shuffle();
+		queueMicrotask(() => {
+			this.startAllStreams();
+			this.unmute(this.index);
+			this.retune();
+		});
+	},
+	mounted() {
+		this.dbg('mounted', {debug: this.debug, hint: 'Use ?debug in URL or localStorage.spiritDebug=1'});
+		if (this.debug) {
+			window.addEventListener('click', (event) => {
+				const target = event.target;
+				this.dbg('window click', {
+					tag: target?.tagName,
+					id: target?.id || null,
+					className: target?.className || null,
+				});
+			});
+			setInterval(() => {
+				this.dbg('heartbeat', {
+					play: this.play,
+					index: this.index,
+					stations: this.stations.length,
+					intervalActive: !!this.interval,
+				});
+			}, 2000);
+		}
+		fetch("./stations.json?v=20261018")
+			.then((response) => response.json())
+			.then((json) => {
+				this.allStations = json;
+				this.dbg('stations loaded', {count: this.allStations.length});
+				const playButton = document.getElementById('playButton');
+				if (playButton && this.debug) {
+					playButton.addEventListener('click', () => {
+						this.dbg('native play button click observed');
+					});
+				}
+				if (this.number > this.allStations.length) {
+					this.number = this.allStations.length;
+				}
+			})
+			.catch((error) => {
+				console.error('Failed to load stations.json', error);
+				this.dbg('stations load failed', {message: error?.message ?? String(error)});
+				this.allStations = [];
+			});
+	},
+}).mount();

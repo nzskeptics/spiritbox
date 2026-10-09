@@ -4,33 +4,33 @@
 		<meta charset="utf-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<link rel="stylesheet" href="/reset.min.css" />
-		<script type="module" src="/spirit.js"></script>
-		<link rel="stylesheet" href="/style.css">
+		<link rel="stylesheet" href="./reset.min.css" />
+		<script type="module" src="./spirit.js?v=20261018"></script>
+		<link rel="stylesheet" href="./style.css">
 		<title>Spirit Box</title>
 	</head>
 	<body>
-		<form @vue:mounted="mounted">
+		<form v-scope @vue:mounted="mounted">
 			<div id="grille"><p><a href="https://skeptics.nz/" class="link">NZ Skeptics</a> Radio Co<span></span></p></div>
 			<div id="tuner">
 				<div class="glass"></div>
-				<div id="station"><span> - </span><template v-for="id in number"><span>{{id}}</span><span> - </span></template><strong>ID</strong></div>
-				<div id="bar"><template v-for="n in 512">|</template></div>
-				<div id="bar"><template v-for="n in 64"><template v-for="n in 4">.</template>|</template><template v-for="n in 4">.</template></div>
-				<div id="frequency"><template v-for="ms in times"><span>{{ms}}</span></template> <strong>MS</strong></div>
+				<div id="station"><span> - </span><template v-for="id in stationDigits" :key="'digit-' + id"><span>{{id}}</span><span> - </span></template><strong>ID</strong></div>
+				<div id="bar">{{barPrimary}}</div>
+				<div id="bar">{{barSecondary}}</div>
+				<div id="frequency"><template v-for="ms in times" :key="ms"><span>{{ms}}</span></template> <strong>MS</strong></div>
 			</div>
-			<h2><a v-if="station" :href="station.website">{{station.name}}</a></h2>
+			<h2 v-if="station"><a :href="station?.website || '#'">{{station?.name || ''}}</a></h2>
 			<div id="controls">
 				<div>
-					<div class="led" :class="{red: play}"></div>
-					<button type='button' @click="playPause">{{play ? 'Stop' : 'Play'}}</button><!-- style="position: absolute; right: 300px; top: 300px;" -->
+					<div class="led" :class="{red: play}" @click="onPlayClick" title="Play / Stop"></div>
+					<button id="playButton" type='button' @click.prevent="onPlayClick">{{play ? 'Stop' : 'Play'}}</button><!-- style="position: absolute; right: 300px; top: 300px;" -->
 				</div>
-				<input type="range" min="0" max="100" v-model.number="volume" :title="volume + '%'" @change="retune" />
-				<input v-if="allStations" type="range" min="4" max="16" v-model.number="number" :title="range + ' stations'" @change="retune" />
+				<input type="range" min="0" max="100" v-model.number="volume" :title="volume + '%'" @input="updateVolume" @change="updateVolume" />
+				<input v-if="allStations?.length" type="range" min="4" max="16" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
 				<input type="range" min="200" max="1000" step="100" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
 			</div>
-			<div>
-				<audio v-for="(station, id) in stations" :key="station.url" :ref="'audio' + id" autoplay :src="station.url"></audio>
+			<div id="audioBank">
+				<audio v-for="(station, id) in stations" :key="id" :data-audio-index="id" :src="station.url"></audio>
 			</div>
 	</form>
 	</body>

@@ -1,18 +1,29 @@
 const files = [
-	'https://unpkg.com/petite-vue?module',
-	'/spirit.js',
-	'/index.html',
-	'/style.css',
-	'/stations.json',
-	'/wood.jpg',
-	'/grille.jpg',
+	'./petite-vue.es.js',
+	'./spirit.js',
+	'./index.html',
+	'./style.css',
+	'./stations.json',
+	'./wood.jpg',
+	'./grille.jpg',
 ];
+const cacheName = 'v2';
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(
-		caches.open('v1').then((cache) => {
+		caches.open(cacheName).then((cache) => {
 			return cache.addAll(files);
 		})
+	);
+});
+
+self.addEventListener('activate', (event) => {
+	event.waitUntil(
+		caches.keys().then((keys) => Promise.all(
+			keys
+				.filter((key) => key !== cacheName)
+				.map((key) => caches.delete(key))
+		))
 	);
 });
 
@@ -21,7 +32,7 @@ self.addEventListener('fetch', (event) => {
 	event.respondWith(
 		caches.match(event.request).then((resp) => {
 			return resp || fetch(event.request).then((response) => {
-				return caches.open('v1').then((cache) => {
+				return caches.open(cacheName).then((cache) => {
 					cache.put(event.request, response.clone());
 					return response;
 				});
