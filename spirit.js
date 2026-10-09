@@ -28,20 +28,35 @@ function noise() {
 }
 // noise.connect(audioContext.destination);
 // import {createApp} from 'https://unpkg.com/petite-vue?module';
-import {createApp} from './petite-vue.es.js?v=20261018';
+import {createApp} from './petite-vue.es.js?v=20261020';
+
+const UI_CONFIG = {
+	// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
+	needleMotion: 'analog',
+};
+
+function normalizeNeedleMotion(value) {
+	if (['step', 'smooth', 'analog'].includes(value)) return value;
+	return 'analog';
+}
+
 const debugEnabled = new URLSearchParams(window.location.search).has('debug')
 	|| localStorage.getItem('spiritDebug') === '1'
 	|| ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 console.info('[spirit] script loaded', {
-	version: '20261018',
+	version: '20261020',
 	debugEnabled,
 	host: window.location.host,
 	search: window.location.search,
+	needleMotion: normalizeNeedleMotion(UI_CONFIG.needleMotion),
 });
 
 createApp({
 	debug: debugEnabled,
+	needleMotion: normalizeNeedleMotion(UI_CONFIG.needleMotion),
+	tuneDisplayPercent: 0,
+	needleFrame: null,
 	number: 6,
 	volume: 50,
 	ms: 300,
@@ -70,6 +85,55 @@ createApp({
 		if (!this.play) return null;
 		return this.stations?.[this.index];
 	},
+	get currentStationNumber() {
+		return Math.min(this.number, Math.max(1, this.index + 1));
+	},
+	get tunePercent() {
+		if (this.number <= 1) return 0;
+		const clamped = Math.min(this.number - 1, Math.max(0, this.index));
+		return (clamped / (this.number - 1)) * 100;
+	},
+	get needleMotionClass() {
+		return `motion-${this.needleMotion}`;
+	},
+	get needleStyle() {
+		return {left: `${this.tuneDisplayPercent}%`};
+	},
+	syncNeedle() {
+		const target = this.tunePercent;
+		if (this.needleMotion === 'step' || this.needleMotion === 'smooth') {
+			if (this.needleFrame) cancelAnimationFrame(this.needleFrame);
+			this.needleFrame = null;
+			this.tuneDisplayPercent = target;
+			return;
+		}
+		this.animateNeedle(target);
+	},
+	animateNeedle(target) {
+		if (this.needleFrame) cancelAnimationFrame(this.needleFrame);
+		const start = this.tuneDisplayPercent;
+		const delta = target - start;
+		if (Math.abs(delta) < 0.1) {
+			this.tuneDisplayPercent = target;
+			this.needleFrame = null;
+			return;
+		}
+		const startTime = performance.now();
+		const duration = 260 + Math.min(240, Math.abs(delta) * 8);
+		const step = (now) => {
+			const t = Math.min(1, (now - startTime) / duration);
+			const eased = 1 - Math.pow(1 - t, 3);
+			const wobble = Math.sin(t * Math.PI * 4) * (1 - t) * 0.6;
+			this.tuneDisplayPercent = start + delta * eased + wobble;
+			if (t < 1) {
+				this.needleFrame = requestAnimationFrame(step);
+				return;
+			}
+			this.tuneDisplayPercent = target;
+			this.needleFrame = null;
+		};
+		this.needleFrame = requestAnimationFrame(step);
+	},
 	onPlayClick() {
 		this.dbg('play button clicked', {
 			play: this.play,
@@ -94,6 +158,7 @@ createApp({
 				}
 			}
 			this.index = next;
+			this.syncNeedle();
 			this.dbg('retune tick', {index: this.index, name: this.station?.name, url: this.station?.url});
 			this.unmute(this.index);
 		}, this.ms);
@@ -177,6 +242,7 @@ createApp({
 		this.dbg('station count changed', {number: this.number, stationCount});
 		if (!stationCount) return;
 		if (this.index >= stationCount) this.index = 0;
+		this.syncNeedle();
 		if (this.play) {
 			queueMicrotask(() => {
 				this.startAllStreams();
@@ -211,6 +277,7 @@ createApp({
 	},
 	mounted() {
 		this.dbg('mounted', {debug: this.debug, hint: 'Use ?debug in URL or localStorage.spiritDebug=1'});
+		this.syncNeedle();
 		if (this.debug) {
 			window.addEventListener('click', (event) => {
 				const target = event.target;
@@ -229,7 +296,7 @@ createApp({
 				});
 			}, 2000);
 		}
-		fetch("./stations.json?v=20261018")
+		fetch("./stations.json?v=20261020")
 			.then((response) => response.json())
 			.then((json) => {
 				this.allStations = json;
@@ -243,6 +310,7 @@ createApp({
 				if (this.number > this.allStations.length) {
 					this.number = this.allStations.length;
 				}
+				this.syncNeedle();
 			})
 			.catch((error) => {
 				console.error('Failed to load stations.json', error);
