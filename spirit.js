@@ -1,16 +1,62 @@
 // import stations from './stations.json'
-const audioContext = new AudioContext();
-audioContext.createGain();
-const bufferSize = 4096;
-function noise(profile) {
+// import {createApp} from 'https://unpkg.com/petite-vue?module';
+import {createApp} from './petite-vue.es.js?v=20261028';
+import {RADIO_BROWSER_API_BASE, fetchRadioBrowserStationsWithFailover} from './radioBrowserApi.mjs';
+
+const APP_CONFIG = {
+	radio: {
+		bases: [RADIO_BROWSER_API_BASE],
+		limit: 200,
+		offset: 0,
+		timeoutMs: 10000,
+		retries: 2,
+		retryDelayMs: 350,
+	},
+	audio: {
+		workletModule: './noise-worklet.js?v=20261028',
+		streamPrewarmCount: 3,
+		bufferSize: 4096,
+	},
+	defaults: {
+		number: 12,
+		volume: 50,
+		ms: 300,
+		staticRatio: 50,
+		jitterMs: 50,
+	},
+	ui: {
+		// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
+		needleMotion: 'analog',
+		transitions: {
+			stationToStationMs: 520,
+			stationToStaticMs: 720,
+			staticToStationMs: 880,
+			volumeRampMs: 180,
+			keepStaticEngineWarm: true,
+		},
+	},
+};
+
+let audioContext = null;
+let noiseWorkletReady = false;
+let noiseWorkletLoadingPromise = null;
+
+function getAudioContext() {
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
+	return audioContext;
+}
+
+function createScriptNoiseNode(context, profile) {
 	const lowpass = profile.lowpass;
 	const hiss = profile.hiss;
 	const crackleChance = profile.crackleChance;
 	let last = 0;
-	const node = audioContext.createScriptProcessor(bufferSize, 1, 1);
+	const node = context.createScriptProcessor(APP_CONFIG.audio.bufferSize, 1, 1);
 	node.onaudioprocess = function(e) {
 		const output = e.outputBuffer.getChannelData(0);
-		for (let i = 0; i < bufferSize; i++) {
+		for (let i = 0; i < APP_CONFIG.audio.bufferSize; i++) {
 			const white = Math.random() * 2 - 1;
 			last = last * lowpass + white * (1 - lowpass);
 			let sample = last * (1 - hiss) + white * hiss;
@@ -22,23 +68,24 @@ function noise(profile) {
 	};
 	return node;
 }
-// noise.connect(audioContext.destination);
-// import {createApp} from 'https://unpkg.com/petite-vue?module';
-import {createApp} from './petite-vue.es.js?v=20261027';
-import {RADIO_BROWSER_API_BASE, fetchRadioBrowserStationsWithFailover} from './radioBrowserApi.mjs';
 
-const UI_CONFIG = {
-	// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
-	needleMotion: 'analog',
-	transitions: {
-		// Crossfades for different mode switches.
-		stationToStationMs: 520,
-		stationToStaticMs: 720,
-		staticToStationMs: 880,
-		volumeRampMs: 180,
-		keepStaticEngineWarm: true,
-	},
-};
+async function ensureNoiseWorkletLoaded(context) {
+	if (!context.audioWorklet) return false;
+	if (noiseWorkletReady) return true;
+	if (!noiseWorkletLoadingPromise) {
+		noiseWorkletLoadingPromise = context.audioWorklet
+			.addModule(APP_CONFIG.audio.workletModule)
+			.then(() => {
+				noiseWorkletReady = true;
+				return true;
+			})
+			.catch((error) => {
+				console.warn('Falling back to ScriptProcessor static noise:', error?.message || error);
+				return false;
+			});
+	}
+	return noiseWorkletLoadingPromise;
+}
 
 function normalizeNeedleMotion(value) {
 	if (['step', 'smooth', 'analog'].includes(value)) return value;
@@ -47,12 +94,12 @@ function normalizeNeedleMotion(value) {
 
 async function getStationsFromRadioBrowser() {
 	const result = await fetchRadioBrowserStationsWithFailover({
-		bases: [RADIO_BROWSER_API_BASE],
-		limit: 200,
-		offset: 0,
-		timeoutMs: 10000,
-		retries: 2,
-		retryDelayMs: 350,
+		bases: APP_CONFIG.radio.bases,
+		limit: APP_CONFIG.radio.limit,
+		offset: APP_CONFIG.radio.offset,
+		timeoutMs: APP_CONFIG.radio.timeoutMs,
+		retries: APP_CONFIG.radio.retries,
+		retryDelayMs: APP_CONFIG.radio.retryDelayMs,
 	});
 	const stations = result.stations;
 	if (!stations.length) {
@@ -62,31 +109,42 @@ async function getStationsFromRadioBrowser() {
 }
 
 createApp({
-	needleMotion: normalizeNeedleMotion(UI_CONFIG.needleMotion),
+	needleMotion: normalizeNeedleMotion(APP_CONFIG.ui.needleMotion),
 	tuneDisplayPercent: 0,
 	needleFrame: null,
-	stationToStationMs: UI_CONFIG.transitions.stationToStationMs,
-	stationToStaticMs: UI_CONFIG.transitions.stationToStaticMs,
-	staticToStationMs: UI_CONFIG.transitions.staticToStationMs,
-	volumeRampMs: UI_CONFIG.transitions.volumeRampMs,
-	keepStaticEngineWarm: UI_CONFIG.transitions.keepStaticEngineWarm,
+	stationToStationMs: APP_CONFIG.ui.transitions.stationToStationMs,
+	stationToStaticMs: APP_CONFIG.ui.transitions.stationToStaticMs,
+	staticToStationMs: APP_CONFIG.ui.transitions.staticToStationMs,
+	volumeRampMs: APP_CONFIG.ui.transitions.volumeRampMs,
+	keepStaticEngineWarm: APP_CONFIG.ui.transitions.keepStaticEngineWarm,
 	fadeToken: 0,
-	staticRatio: 50,
-	jitterMs: 50,
+	staticRatio: APP_CONFIG.defaults.staticRatio,
+	jitterMs: APP_CONFIG.defaults.jitterMs,
 	isStatic: false,
 	staticPosition: 0,
 	staticNode: null,
 	staticFilter: null,
 	staticGain: null,
+	staticInitPromise: null,
 	staticLevelFactor: 0.28,
-	number: 12,
-	volume: 50,
-	ms: 300,
+	streamPrewarmCount: APP_CONFIG.audio.streamPrewarmCount,
+	number: APP_CONFIG.defaults.number,
+	volume: APP_CONFIG.defaults.volume,
+	ms: APP_CONFIG.defaults.ms,
 	index: 0,
 	allStations: null,
 	retuneTimer: null,
 	play: false,
 	times: [200, 400, 600, 800, 1000],
+	playSilently(audio) {
+		if (!audio?.paused) return;
+		const playPromise = audio.play?.();
+		if (playPromise?.catch) playPromise.catch(() => {});
+	},
+	clearRetuneTimer() {
+		clearTimeout(this.retuneTimer);
+		this.retuneTimer = null;
+	},
 	applyStations(stations, source) {
 		this.allStations = stations;
 		if (this.number > this.allStations.length) {
@@ -101,10 +159,12 @@ createApp({
 				const remote = await getStationsFromRadioBrowser();
 				this.applyStations(remote.stations, remote.source);
 				return;
-			} catch (error) {}
+			} catch (error) {
+				console.warn('Remote station load failed, falling back to stations.json:', error?.message || error);
+			}
 		}
 		try {
-			const response = await fetch('./stations.json?v=20261027');
+			const response = await fetch('./stations.json?v=20261028');
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
@@ -186,10 +246,54 @@ createApp({
 		this.playPause();
 	},
 	async ensureAudioContext() {
-		if (audioContext.state !== 'running') {
+		const context = getAudioContext();
+		if (context.state !== 'running') {
 			try {
-				await audioContext.resume();
-			} catch (error) {}
+				await context.resume();
+			} catch (error) {
+				console.warn('AudioContext resume failed:', error?.message || error);
+			}
+		}
+		try {
+			await ensureNoiseWorkletLoaded(context);
+		} catch (error) {
+			console.warn('Noise worklet init failed:', error?.message || error);
+		}
+	},
+	createNoiseNode(profile) {
+		const context = getAudioContext();
+		if (noiseWorkletReady) {
+			const node = new AudioWorkletNode(context, 'spirit-noise-processor');
+			node.port.postMessage({type: 'set-profile', profile});
+			return node;
+		}
+		return createScriptNoiseNode(context, profile);
+	},
+	getWarmStationIndexes(anchorIndex = this.index) {
+		const count = this.stations.length;
+		const warmCount = Math.min(Math.max(1, this.streamPrewarmCount), count);
+		const warm = new Set();
+		if (!count) return warm;
+		const start = Math.min(Math.max(0, anchorIndex), count - 1);
+		for (let i = 0; i < warmCount; i++) {
+			warm.add((start + i) % count);
+		}
+		return warm;
+	},
+	refreshStreamWarmPool(anchorIndex = this.index) {
+		const warm = this.getWarmStationIndexes(anchorIndex);
+		for (const i of this.stations.keys()) {
+			const audio = this.getAudio(i);
+			if (!audio) continue;
+			if (warm.has(i)) {
+				audio.muted = true;
+				audio.volume = 0;
+				this.playSilently(audio);
+				continue;
+			}
+			audio.muted = true;
+			audio.volume = 0;
+			audio.pause?.();
 		}
 	},
 	chooseNextIndex() {
@@ -230,12 +334,7 @@ createApp({
 			return;
 		}
 		audio.muted = false;
-		if (audio.paused) {
-			const playPromise = audio.play?.();
-			if (playPromise?.catch) {
-				playPromise.catch(() => {});
-			}
-		}
+		this.playSilently(audio);
 		const start = performance.now();
 		const step = (now) => {
 			if (token !== this.fadeToken) return;
@@ -244,9 +343,7 @@ createApp({
 			const value = this.clampVolume(from + (to - from) * eased);
 			audio.volume = value;
 			audio.muted = value <= 0.001;
-			if (t < 1) {
-				requestAnimationFrame(step);
-			}
+			if (t < 1) requestAnimationFrame(step);
 		};
 		requestAnimationFrame(step);
 	},
@@ -280,50 +377,55 @@ createApp({
 	},
 	retuneStaticTexture() {
 		if (!this.staticFilter) return;
-		const now = audioContext.currentTime;
+		const context = getAudioContext();
+		const now = context.currentTime;
 		const targetFrequency = 980 + (Math.random() - 0.5) * 220;
 		const targetQ = 0.85 + Math.random() * 0.45;
 		this.staticFilter.frequency.setTargetAtTime(targetFrequency, now, 0.06);
 		this.staticFilter.Q.setTargetAtTime(targetQ, now, 0.08);
 		this.staticLevelFactor = Math.max(0.24, Math.min(0.32, this.staticLevelFactor + (Math.random() - 0.5) * 0.03));
 	},
-	startStatic() {
+	async startStatic() {
 		if (this.staticNode && this.staticFilter && this.staticGain) return;
-		const profile = {
-			lowpass: 0.89 + Math.random() * 0.04,
-			hiss: 0.31 + Math.random() * 0.12,
-			crackleChance: 0.001 + Math.random() * 0.0025,
-		};
-		const node = noise(profile);
-		const filter = audioContext.createBiquadFilter();
-		filter.type = 'bandpass';
-		filter.frequency.value = 980;
-		filter.Q.value = 1.0;
-		const gain = audioContext.createGain();
-		gain.gain.value = 0;
-		node.connect(filter);
-		filter.connect(gain);
-		gain.connect(audioContext.destination);
-		this.staticNode = node;
-		this.staticFilter = filter;
-		this.staticGain = gain;
-		this.staticLevelFactor = 0.27 + Math.random() * 0.04;
+		if (this.staticInitPromise) return this.staticInitPromise;
+		this.staticInitPromise = (async () => {
+			await this.ensureAudioContext();
+			const context = getAudioContext();
+			const profile = {
+				lowpass: 0.89 + Math.random() * 0.04,
+				hiss: 0.31 + Math.random() * 0.12,
+				crackleChance: 0.001 + Math.random() * 0.0025,
+			};
+			const node = this.createNoiseNode(profile);
+			const filter = context.createBiquadFilter();
+			filter.type = 'bandpass';
+			filter.frequency.value = 980;
+			filter.Q.value = 1.0;
+			const gain = context.createGain();
+			gain.gain.value = 0;
+			node.connect(filter);
+			filter.connect(gain);
+			gain.connect(context.destination);
+			this.staticNode = node;
+			this.staticFilter = filter;
+			this.staticGain = gain;
+			this.staticLevelFactor = 0.27 + Math.random() * 0.04;
+		})();
+		try {
+			await this.staticInitPromise;
+		} finally {
+			this.staticInitPromise = null;
+		}
 	},
 	stopStatic() {
 		if (this.staticNode) {
-			try {
-				this.staticNode.disconnect();
-			} catch {}
+			try { this.staticNode.disconnect(); } catch {}
 		}
 		if (this.staticFilter) {
-			try {
-				this.staticFilter.disconnect();
-			} catch {}
+			try { this.staticFilter.disconnect(); } catch {}
 		}
 		if (this.staticGain) {
-			try {
-				this.staticGain.disconnect();
-			} catch {}
+			try { this.staticGain.disconnect(); } catch {}
 		}
 		this.staticNode = null;
 		this.staticFilter = null;
@@ -335,13 +437,21 @@ createApp({
 		this.isStatic = true;
 		this.staticPosition = this.chooseStaticPosition();
 		this.syncNeedle();
-		this.startStatic();
-		this.retuneStaticTexture();
 		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.stationToStaticMs * 0.7)) : this.stationToStaticMs;
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, 0, fadeMs, token);
 		}
-		this.fadeStaticGain(this.staticTargetGain(), fadeMs, token);
+		const applyStaticFade = () => {
+			this.retuneStaticTexture();
+			this.fadeStaticGain(this.staticTargetGain(), fadeMs, token);
+		};
+		if (this.staticNode && this.staticFilter && this.staticGain) {
+			applyStaticFade();
+			return;
+		}
+		this.startStatic().then(applyStaticFade).catch((error) => {
+			console.warn('Static engine start failed:', error?.message || error);
+		});
 	},
 	playStation(index) {
 		const wasStatic = this.isStatic;
@@ -350,15 +460,12 @@ createApp({
 		this.isStatic = false;
 		this.index = index;
 		this.syncNeedle();
+		this.refreshStreamWarmPool(index);
 		const fadeMs = wasStatic ? this.staticToStationMs : this.stationToStationMs;
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, i === index ? targetVolume : 0, fadeMs, token);
 		}
-		if (wasStatic) {
-			this.fadeStaticGain(0, fadeMs, token, !this.keepStaticEngineWarm);
-		} else {
-			this.fadeStaticGain(0, this.stationToStationMs, token, !this.keepStaticEngineWarm);
-		}
+		this.fadeStaticGain(0, wasStatic ? fadeMs : this.stationToStationMs, token, !this.keepStaticEngineWarm);
 	},
 	playNextSelection() {
 		if (this.shouldPlayStatic()) {
@@ -383,11 +490,8 @@ createApp({
 		}, delay);
 	},
 	retune() {
-		clearTimeout(this.retuneTimer);
-		this.retuneTimer = null;
-		if (!this.play || !this.stations.length) {
-			return;
-		}
+		this.clearRetuneTimer();
+		if (!this.play || !this.stations.length) return;
 		this.scheduleRetuneTick();
 	},
 	getAudio(index) {
@@ -395,22 +499,13 @@ createApp({
 	},
 	setAudioVolume(index, value) {
 		const audio = this.getAudio(index);
-		if (!audio) {
-			return;
-		}
+		if (!audio) return;
 		audio.muted = value === 0;
 		audio.volume = value;
-		if (audio.paused) {
-			const playPromise = audio.play?.();
-			if (playPromise?.catch) {
-				playPromise.catch(() => {});
-			}
-		}
+		this.playSilently(audio);
 	},
 	startAllStreams() {
-		for (const i of this.stations.keys()) {
-			this.setAudioVolume(i, 0);
-		}
+		this.refreshStreamWarmPool(this.index);
 	},
 	stopAllStreams() {
 		this.stopStatic();
@@ -424,9 +519,8 @@ createApp({
 		}
 	},
 	unmute(index) {
-		if (!this.play || !this.stations.length) {
-			return;
-		}
+		if (!this.play || !this.stations.length) return;
+		this.refreshStreamWarmPool(index);
 		for (const i of this.stations.keys()) {
 			this.setAudioVolume(i, 0);
 		}
@@ -451,24 +545,25 @@ createApp({
 		if (this.play) {
 			queueMicrotask(() => {
 				this.startAllStreams();
-				if (this.isStatic) {
-					this.playStatic();
-				} else {
-					this.unmute(this.index);
-				}
+				if (this.isStatic) this.playStatic();
+				else this.unmute(this.index);
 			});
 		}
 		this.retune();
 	},
 	shuffle() {
 		if (!this.allStations?.length) return;
-		this.allStations = this.allStations.sort(() => Math.random() - 0.5);
+		const shuffled = [...this.allStations];
+		for (let i = shuffled.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+		}
+		this.allStations = shuffled;
 	},
 	playPause() {
 		if (!this.allStations?.length) return;
 		if (this.play) {
-			clearTimeout(this.retuneTimer);
-			this.retuneTimer = null;
+			this.clearRetuneTimer();
 			this.stopAllStreams();
 			this.play = false;
 			return;
