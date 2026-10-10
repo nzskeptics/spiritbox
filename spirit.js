@@ -6,8 +6,9 @@ import {RADIO_BROWSER_API_BASE, fetchRadioBrowserStationsWithFailover} from './r
 const APP_CONFIG = {
 	radio: {
 		bases: [RADIO_BROWSER_API_BASE],
-		limit: 200,
 		offset: 0,
+		randomizeOffset: true,
+		totalTopStations: 1000,
 		timeoutMs: 10000,
 		retries: 2,
 		retryDelayMs: 350,
@@ -18,11 +19,34 @@ const APP_CONFIG = {
 		bufferSize: 4096,
 	},
 	defaults: {
-		number: 12,
+		maxStations: 20,
+		number: 10,
 		volume: 50,
 		ms: 300,
 		staticRatio: 50,
 		jitterMs: 50,
+	},
+	controls: {
+		volume: {
+			min: 0,
+			max: 100,
+			step: 1,
+		},
+		ms: {
+			min: 200,
+			max: 1000,
+			step: 100,
+		},
+		staticRatio: {
+			min: 0,
+			max: 100,
+			step: 5,
+		},
+		jitterMs: {
+			min: 0,
+			max: 200,
+			step: 5,
+		},
 	},
 	ui: {
 		// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
@@ -92,11 +116,27 @@ function normalizeNeedleMotion(value) {
 	return 'analog';
 }
 
-async function getStationsFromRadioBrowser() {
+function clampValue(value, min, max) {
+	return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function getRandomStationOffset(limit) {
+	const {offset, randomizeOffset, totalTopStations} = APP_CONFIG.radio;
+	const safeLimit = Math.max(1, Number(limit) || 1);
+	if (!randomizeOffset) return offset;
+	const poolSize = Math.max(safeLimit, Number(totalTopStations) || safeLimit);
+	const pageCount = Math.max(1, Math.floor(poolSize / safeLimit));
+	const page = Math.floor(Math.random() * pageCount);
+	return Math.max(0, Number(offset) || 0) + page * safeLimit;
+}
+
+async function getStationsFromRadioBrowser(limit) {
+	const safeLimit = Math.max(1, Number(limit) || 1);
+	const offset = getRandomStationOffset(safeLimit);
 	const result = await fetchRadioBrowserStationsWithFailover({
 		bases: APP_CONFIG.radio.bases,
-		limit: APP_CONFIG.radio.limit,
-		offset: APP_CONFIG.radio.offset,
+		limit: safeLimit,
+		offset,
 		timeoutMs: APP_CONFIG.radio.timeoutMs,
 		retries: APP_CONFIG.radio.retries,
 		retryDelayMs: APP_CONFIG.radio.retryDelayMs,
@@ -118,8 +158,20 @@ createApp({
 	volumeRampMs: APP_CONFIG.ui.transitions.volumeRampMs,
 	keepStaticEngineWarm: APP_CONFIG.ui.transitions.keepStaticEngineWarm,
 	fadeToken: 0,
-	staticRatio: APP_CONFIG.defaults.staticRatio,
-	jitterMs: APP_CONFIG.defaults.jitterMs,
+	volumeMin: APP_CONFIG.controls.volume.min,
+	volumeMax: APP_CONFIG.controls.volume.max,
+	volumeStep: APP_CONFIG.controls.volume.step,
+	msMin: APP_CONFIG.controls.ms.min,
+	msMax: APP_CONFIG.controls.ms.max,
+	msStep: APP_CONFIG.controls.ms.step,
+	staticRatioMin: APP_CONFIG.controls.staticRatio.min,
+	staticRatioMax: APP_CONFIG.controls.staticRatio.max,
+	staticRatioStep: APP_CONFIG.controls.staticRatio.step,
+	jitterMin: APP_CONFIG.controls.jitterMs.min,
+	jitterMax: APP_CONFIG.controls.jitterMs.max,
+	jitterStep: APP_CONFIG.controls.jitterMs.step,
+	staticRatio: clampValue(APP_CONFIG.defaults.staticRatio, APP_CONFIG.controls.staticRatio.min, APP_CONFIG.controls.staticRatio.max),
+	jitterMs: clampValue(APP_CONFIG.defaults.jitterMs, APP_CONFIG.controls.jitterMs.min, APP_CONFIG.controls.jitterMs.max),
 	isStatic: false,
 	staticPosition: 0,
 	staticNode: null,
@@ -128,9 +180,10 @@ createApp({
 	staticInitPromise: null,
 	staticLevelFactor: 0.28,
 	streamPrewarmCount: APP_CONFIG.audio.streamPrewarmCount,
-	number: APP_CONFIG.defaults.number,
-	volume: APP_CONFIG.defaults.volume,
-	ms: APP_CONFIG.defaults.ms,
+	maxStations: Math.max(1, APP_CONFIG.defaults.maxStations),
+	number: Math.max(1, Math.min(APP_CONFIG.defaults.number, APP_CONFIG.defaults.maxStations)),
+	volume: clampValue(APP_CONFIG.defaults.volume, APP_CONFIG.controls.volume.min, APP_CONFIG.controls.volume.max),
+	ms: clampValue(APP_CONFIG.defaults.ms, APP_CONFIG.controls.ms.min, APP_CONFIG.controls.ms.max),
 	index: 0,
 	allStations: null,
 	retuneTimer: null,
@@ -156,7 +209,7 @@ createApp({
 		const preferFile = new URLSearchParams(window.location.search).get('source') === 'file';
 		if (!preferFile) {
 			try {
-				const remote = await getStationsFromRadioBrowser();
+				const remote = await getStationsFromRadioBrowser(this.maxStations);
 				this.applyStations(remote.stations);
 				return;
 			} catch (error) {
@@ -476,7 +529,10 @@ createApp({
 		this.playStation(next);
 	},
 	nextRetuneDelay() {
-		const jitter = Math.max(0, Number(this.jitterMs) || 0);
+		this.ms = clampValue(this.ms, this.msMin, this.msMax);
+		this.staticRatio = clampValue(this.staticRatio, this.staticRatioMin, this.staticRatioMax);
+		this.jitterMs = clampValue(this.jitterMs, this.jitterMin, this.jitterMax);
+		const jitter = this.jitterMs;
 		const min = Math.max(50, this.ms - jitter);
 		const max = this.ms + jitter;
 		return Math.floor(min + Math.random() * (max - min + 1));
@@ -528,6 +584,7 @@ createApp({
 	},
 	updateVolume() {
 		if (!this.play) return;
+		this.volume = clampValue(this.volume, this.volumeMin, this.volumeMax);
 		const token = this.beginTransition();
 		if (this.isStatic && this.staticGain) {
 			this.fadeStaticGain(this.staticTargetGain(), this.volumeRampMs, token);
@@ -538,6 +595,7 @@ createApp({
 		}
 	},
 	updateStationCount() {
+		this.number = Math.max(1, Math.min(this.number, this.maxStations));
 		const stationCount = Math.min(this.number, this.allStations?.length ?? 0);
 		if (!stationCount) return;
 		if (this.index >= stationCount) this.index = 0;

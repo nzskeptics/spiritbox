@@ -100,6 +100,9 @@ form::before {
 #grille p {
 	margin: 0;
 	padding: 0.45rem 0.65rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
 	font-size: clamp(1rem, 2.1vw, 1.45rem);
 	letter-spacing: 0.05em;
 	line-height: 1.25;
@@ -109,6 +112,15 @@ form::before {
 	background: linear-gradient(180deg, #f3d9a2 0%, #c29653 100%);
 	border-radius: 7px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+.badge-logo {
+	width: 1.2em;
+	height: 1.2em;
+	flex: 0 0 auto;
+	--logo-shell: #6b6b6b;
+	--logo-center: #6b6b6b;
+	filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.25));
 }
 
 .link {

@@ -4,6 +4,7 @@
 		<meta charset="utf-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="icon" type="image/svg+xml" href="./logo.svg">
 		<link rel="stylesheet" href="./reset.min.css" />
 		<script type="module" src="./spirit.js?v=20261028"></script>
 		<link rel="stylesheet" href="./style.css">
@@ -11,7 +12,7 @@
 	</head>
 	<body>
 		<form v-scope @vue:mounted="mounted">
-			<div id="grille"><p><a href="https://skeptics.nz/" class="link">NZ Skeptics</a> Radio Co<span></span></p></div>
+			<div id="grille"><p><img src="./logo.svg" alt="Spirit Box Logo" style="width: 24px; height: 24px"><a href="https://skeptics.nz/" class="link">NZ Skeptics</a> Radio</p></div>
 			<div id="tuner">
 				<div class="glass"></div>
 				<div id="station">
@@ -55,25 +56,25 @@
 						>
 							<div class="volume-dial-value">{{volume}}%</div>
 						</div>
-						<input id="volumeSlider" class="volume-slider" type="range" min="0" max="100" v-model.number="volume" :title="volume + '%'" @input="updateVolume" @change="updateVolume" />
+						<input id="volumeSlider" class="volume-slider" type="range" :min="volumeMin" :max="volumeMax" :step="volumeStep" v-model.number="volume" :title="volume + '%'" @input="updateVolume" @change="updateVolume" />
 					</div>
 				</div>
 				<div class="control-grid">
 					<div v-if="allStations?.length" class="control-group">
 						<label for="stationCountSlider">Stations <span>{{number}}</span></label>
-						<input id="stationCountSlider" type="range" min="4" max="16" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
+						<input id="stationCountSlider" type="range" min="4" :max="maxStations" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
 					</div>
 					<div class="control-group">
 						<label for="switchSlider">Hop <span>{{ms}}ms</span></label>
-						<input id="switchSlider" type="range" min="200" max="1000" step="100" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
+						<input id="switchSlider" type="range" :min="msMin" :max="msMax" :step="msStep" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
 					</div>
 					<div class="control-group">
 						<label for="staticMixSlider">Static <span>{{staticRatio}}%</span></label>
-						<input id="staticMixSlider" type="range" min="0" max="100" step="5" v-model.number="staticRatio" :title="staticRatio + '%'" />
+						<input id="staticMixSlider" type="range" :min="staticRatioMin" :max="staticRatioMax" :step="staticRatioStep" v-model.number="staticRatio" :title="staticRatio + '%'" />
 					</div>
 					<div class="control-group">
 						<label for="jitterSlider">Jitter <span>+/-{{jitterMs}}ms</span></label>
-						<input id="jitterSlider" type="range" min="0" max="200" step="5" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
+						<input id="jitterSlider" type="range" :min="jitterMin" :max="jitterMax" :step="jitterStep" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
 					</div>
 				</div>
 			</div>
