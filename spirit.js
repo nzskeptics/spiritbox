@@ -9,6 +9,7 @@ const APP_CONFIG = {
 		offset: 0,
 		randomizeOffset: true,
 		totalTopStations: 1000,
+		pageSamplesPerLoad: 4,
 		timeoutMs: 10000,
 		retries: 2,
 		retryDelayMs: 350,
@@ -17,6 +18,9 @@ const APP_CONFIG = {
 		workletModule: './noise-worklet.js?v=20261028',
 		streamPrewarmCount: 3,
 		bufferSize: 4096,
+		staticVolumeRelative: 0.2,
+		staticVolumeVariance: 0.03,
+		staticToneVariance: 0.35,
 	},
 	defaults: {
 		maxStations: 20,
@@ -120,32 +124,89 @@ function clampValue(value, min, max) {
 	return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
-function getRandomStationOffset(limit) {
-	const {offset, randomizeOffset, totalTopStations} = APP_CONFIG.radio;
+function getStaticLevelBounds() {
+	const base = clampValue(APP_CONFIG.audio.staticVolumeRelative, 0, 1);
+	const variance = Math.max(0, Number(APP_CONFIG.audio.staticVolumeVariance) || 0);
+	return {
+		min: clampValue(base - variance, 0, 1),
+		max: clampValue(base + variance, 0, 1),
+	};
+}
+
+function randomBetween(min, max) {
+	if (max <= min) return min;
+	return min + Math.random() * (max - min);
+}
+
+function getStaticToneVariance() {
+	return clampValue(APP_CONFIG.audio.staticToneVariance, 0, 1);
+}
+
+function varyTone(center, halfSpread, variance, min, max) {
+	const next = center + (Math.random() * 2 - 1) * halfSpread * variance;
+	return clampValue(next, min, max);
+}
+
+function shuffled(array) {
+	const out = [...array];
+	for (let i = out.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[out[i], out[j]] = [out[j], out[i]];
+	}
+	return out;
+}
+
+function getStationPageCount(limit) {
 	const safeLimit = Math.max(1, Number(limit) || 1);
-	if (!randomizeOffset) return offset;
-	const poolSize = Math.max(safeLimit, Number(totalTopStations) || safeLimit);
-	const pageCount = Math.max(1, Math.floor(poolSize / safeLimit));
-	const page = Math.floor(Math.random() * pageCount);
-	return Math.max(0, Number(offset) || 0) + page * safeLimit;
+	const poolSize = Math.max(safeLimit, Number(APP_CONFIG.radio.totalTopStations) || safeLimit);
+	return Math.max(1, Math.floor(poolSize / safeLimit));
+}
+
+function getSampleOffsets(limit) {
+	const safeLimit = Math.max(1, Number(limit) || 1);
+	const baseOffset = Math.max(0, Number(APP_CONFIG.radio.offset) || 0);
+	if (!APP_CONFIG.radio.randomizeOffset) return [baseOffset];
+	const pageCount = getStationPageCount(safeLimit);
+	const sampleCount = Math.max(1, Math.min(pageCount, Number(APP_CONFIG.radio.pageSamplesPerLoad) || 1));
+	const pages = shuffled(Array.from({length: pageCount}, (_, i) => i)).slice(0, sampleCount);
+	return pages.map((page) => baseOffset + page * safeLimit);
 }
 
 async function getStationsFromRadioBrowser(limit) {
 	const safeLimit = Math.max(1, Number(limit) || 1);
-	const offset = getRandomStationOffset(safeLimit);
-	const result = await fetchRadioBrowserStationsWithFailover({
-		bases: APP_CONFIG.radio.bases,
-		limit: safeLimit,
-		offset,
-		timeoutMs: APP_CONFIG.radio.timeoutMs,
-		retries: APP_CONFIG.radio.retries,
-		retryDelayMs: APP_CONFIG.radio.retryDelayMs,
-	});
-	const stations = result.stations;
-	if (!stations.length) {
+	const offsets = getSampleOffsets(safeLimit);
+	const mergedStations = [];
+	const seenUrls = new Set();
+	let lastError = null;
+
+	for (const offset of offsets) {
+		try {
+			const result = await fetchRadioBrowserStationsWithFailover({
+				bases: APP_CONFIG.radio.bases,
+				limit: safeLimit,
+				offset,
+				timeoutMs: APP_CONFIG.radio.timeoutMs,
+				retries: APP_CONFIG.radio.retries,
+				retryDelayMs: APP_CONFIG.radio.retryDelayMs,
+			});
+			for (const station of result.stations) {
+				if (seenUrls.has(station.url)) continue;
+				seenUrls.add(station.url);
+				mergedStations.push(station);
+			}
+			if (mergedStations.length >= safeLimit) break;
+		} catch (error) {
+			lastError = error;
+		}
+	}
+
+	if (!mergedStations.length) {
+		if (lastError) throw lastError;
 		throw new Error('No compatible stations returned');
 	}
-	return {stations, source: `radio-browser:${RADIO_BROWSER_API_BASE}`};
+
+	const selected = shuffled(mergedStations).slice(0, safeLimit);
+	return {stations: selected, source: `radio-browser:${RADIO_BROWSER_API_BASE}`};
 }
 
 createApp({
@@ -178,7 +239,7 @@ createApp({
 	staticFilter: null,
 	staticGain: null,
 	staticInitPromise: null,
-	staticLevelFactor: 0.28,
+	staticLevelFactor: clampValue(APP_CONFIG.audio.staticVolumeRelative, 0, 1),
 	streamPrewarmCount: APP_CONFIG.audio.streamPrewarmCount,
 	maxStations: Math.max(1, APP_CONFIG.defaults.maxStations),
 	number: Math.max(1, Math.min(APP_CONFIG.defaults.number, APP_CONFIG.defaults.maxStations)),
@@ -432,11 +493,13 @@ createApp({
 		if (!this.staticFilter) return;
 		const context = getAudioContext();
 		const now = context.currentTime;
-		const targetFrequency = 980 + (Math.random() - 0.5) * 220;
-		const targetQ = 0.85 + Math.random() * 0.45;
+		const toneVariance = getStaticToneVariance();
+		const targetFrequency = varyTone(980, 110, toneVariance, 860, 1100);
+		const targetQ = varyTone(1.0, 0.22, toneVariance, 0.82, 1.25);
+		const {min, max} = getStaticLevelBounds();
 		this.staticFilter.frequency.setTargetAtTime(targetFrequency, now, 0.06);
 		this.staticFilter.Q.setTargetAtTime(targetQ, now, 0.08);
-		this.staticLevelFactor = Math.max(0.24, Math.min(0.32, this.staticLevelFactor + (Math.random() - 0.5) * 0.03));
+		this.staticLevelFactor = clampValue(this.staticLevelFactor + (Math.random() - 0.5) * 0.02, min, max);
 	},
 	async startStatic() {
 		if (this.staticNode && this.staticFilter && this.staticGain) return;
@@ -444,10 +507,11 @@ createApp({
 		this.staticInitPromise = (async () => {
 			await this.ensureAudioContext();
 			const context = getAudioContext();
+			const toneVariance = getStaticToneVariance();
 			const profile = {
-				lowpass: 0.89 + Math.random() * 0.04,
-				hiss: 0.31 + Math.random() * 0.12,
-				crackleChance: 0.001 + Math.random() * 0.0025,
+				lowpass: varyTone(0.91, 0.02, toneVariance, 0.87, 0.95),
+				hiss: varyTone(0.34, 0.05, toneVariance, 0.26, 0.42),
+				crackleChance: varyTone(0.0018, 0.0012, toneVariance, 0.0005, 0.0032),
 			};
 			const node = this.createNoiseNode(profile);
 			const filter = context.createBiquadFilter();
@@ -462,7 +526,8 @@ createApp({
 			this.staticNode = node;
 			this.staticFilter = filter;
 			this.staticGain = gain;
-			this.staticLevelFactor = 0.27 + Math.random() * 0.04;
+			const {min, max} = getStaticLevelBounds();
+			this.staticLevelFactor = randomBetween(min, max);
 		})();
 		try {
 			await this.staticInitPromise;
