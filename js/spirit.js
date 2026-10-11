@@ -632,7 +632,7 @@ const SPIRIT_APP_METHODS = {
 			}
 		}
 		try {
-				const response = await fetch('./data/stations.json');
+				const response = await fetch('../data/stations.json');
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
