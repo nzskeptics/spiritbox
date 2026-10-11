@@ -32,7 +32,7 @@ export const APP_CONFIG = {
 	},
 	audio: {
 		engine: {
-			workletModule: './noise-worklet.js',
+			workletModule: './js/noise-worklet.js',
 			streamPrewarmCount: 3,
 			bufferSize: 4096,
 		},

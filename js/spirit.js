@@ -632,7 +632,7 @@ const SPIRIT_APP_METHODS = {
 			}
 		}
 		try {
-				const response = await fetch('../data/stations.json');
+				const response = await fetch('./data/stations.json');
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
@@ -1137,14 +1137,16 @@ const SPIRIT_APP_METHODS = {
 		const start = performance.now();
 		const step = (now) => {
 			if (token !== this.ui.runtime.fadeToken) return;
+			const gainNode = this.static.gain;
+			if (!gainNode) return;
 			const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
 			const eased = t * (2 - t);
-			this.static.gain.gain.value = this.clampVolume(from + (to - from) * eased);
+			gainNode.gain.value = this.clampVolume(from + (to - from) * eased);
 			if (t < 1) {
 				requestAnimationFrame(step);
 				return;
 			}
-			if (stopWhenSilent && this.static.gain.gain.value <= 0.001 && token === this.ui.runtime.fadeToken) {
+			if (stopWhenSilent && gainNode.gain.value <= 0.001 && token === this.ui.runtime.fadeToken) {
 				this.stopStatic();
 			}
 		};

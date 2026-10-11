@@ -4,6 +4,18 @@
 		<meta charset="utf-8">
 		<meta http-equiv="X-UA-Compatible" content="IE=edge">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="description" content="Retro-styled spirit box radio scanner with tunable static, sweep modes, and atmospheric crossfades.">
+		<meta property="og:type" content="website">
+		<meta property="og:title" content="Spirit Box">
+		<meta property="og:description" content="Retro-styled spirit box radio scanner with tunable static, sweep modes, and atmospheric crossfades.">
+		<meta property="og:image" content="./assets/screenshot.jpg">
+		<meta property="og:image:width" content="1200">
+		<meta property="og:image:height" content="630">
+		<meta property="og:image:alt" content="Spirit Box interface screenshot">
+		<meta name="twitter:card" content="summary_large_image">
+		<meta name="twitter:title" content="Spirit Box">
+		<meta name="twitter:description" content="Retro-styled spirit box radio scanner with tunable static, sweep modes, and atmospheric crossfades.">
+		<meta name="twitter:image" content="./assets/screenshot.jpg">
 		<link rel="icon" type="image/svg+xml" href="./assets/logo.svg">
 		<link rel="stylesheet" href="./css/reset.min.css" />
 		<script type="module" src="./js/spirit.js"></script>
@@ -59,41 +71,45 @@
 						<input id="volumeSlider" class="volume-slider" type="range" :min="controls.volume.min" :max="controls.volume.max" :step="controls.volume.step" v-model.number="controls.volume.value" :title="controls.volume.value + '%'" @input="updateVolume" @change="updateVolume" />
 					</div>
 				</div>
-				<div class="control-grid">
-					<div v-if="controls.stations.visible !== false" class="control-group">
-						<label for="stationCountSlider" :title="controls.stations.help">{{controls.stations.label}} <span>{{controls.stations.value}}</span></label>
-						<input id="stationCountSlider" type="range" :min="controls.stations.min" :max="controls.stations.max" :step="controls.stations.step" v-model.number="controls.stations.value" :title="controls.stations.value + ' stations'" :disabled="!allStations?.length" @input="updateStationCount" @change="updateStationCount" />
-					</div>
-					<div v-if="controls.hopIntervalMs.visible !== false" class="control-group">
-						<label for="switchSlider" :title="controls.hopIntervalMs.help">{{controls.hopIntervalMs.label}} <span>{{controls.hopIntervalMs.value}}ms</span></label>
-						<input id="switchSlider" type="range" :min="controls.hopIntervalMs.min" :max="controls.hopIntervalMs.max" :step="controls.hopIntervalMs.step" v-model.number="controls.hopIntervalMs.value" :title="controls.hopIntervalMs.value + 'ms'" @change="retune" />
-					</div>
-					<div v-if="controls.stationDensity.visible !== false" class="control-group">
-						<label for="stationDensitySlider" :title="controls.stationDensity.help">{{controls.stationDensity.label}} <span>{{controls.stationDensity.value}}%</span></label>
-						<input id="stationDensitySlider" type="range" :min="controls.stationDensity.min" :max="controls.stationDensity.max" :step="controls.stationDensity.step" v-model.number="controls.stationDensity.value" :title="controls.stationDensity.value + '%'" />
-					</div>
-					<div v-if="controls.jitterMs.visible !== false" class="control-group">
-						<label for="jitterSlider" :title="controls.jitterMs.help">{{controls.jitterMs.label}} <span>+/-{{controls.jitterMs.value}}ms</span></label>
-						<input id="jitterSlider" type="range" :min="controls.jitterMs.min" :max="controls.jitterMs.max" :step="controls.jitterMs.step" v-model.number="controls.jitterMs.value" :title="'+/-' + controls.jitterMs.value + 'ms'" @change="retune" />
-					</div>
-					<div v-if="controls.motion.visible !== false" class="control-group">
-						<label for="sliderMotionSwitch" :title="controls.motion.help">{{controls.motion.label}} <span>{{motionLabel}}</span></label>
-						<div id="sliderMotionSwitch" class="tri-switch dual-switch" role="group" aria-label="Slider motion mode">
-							<button type="button" :title="controls.motion.optionHelp.random" :class="{active: controls.motion.value === 'random'}" @click="controls.motion.value = 'random'; updateMotion()">Random</button>
-							<button type="button" :title="controls.motion.optionHelp.sweep" :class="{active: controls.motion.value === 'sweep'}" @click="controls.motion.value = 'sweep'; updateMotion()">Sweep</button>
+				<div class="control-columns">
+					<div class="control-column control-column-left">
+						<div v-if="controls.stations.visible !== false" class="control-group">
+							<label for="stationCountSlider" :title="controls.stations.help">{{controls.stations.label}} <span>{{controls.stations.value}}</span></label>
+							<input id="stationCountSlider" type="range" :min="controls.stations.min" :max="controls.stations.max" :step="controls.stations.step" v-model.number="controls.stations.value" :title="controls.stations.value + ' stations'" :disabled="!allStations?.length" @input="updateStationCount" @change="updateStationCount" />
+						</div>
+						<div v-if="controls.stationDensity.visible !== false" class="control-group">
+							<label for="stationDensitySlider" :title="controls.stationDensity.help">{{controls.stationDensity.label}} <span>{{controls.stationDensity.value}}%</span></label>
+							<input id="stationDensitySlider" type="range" :min="controls.stationDensity.min" :max="controls.stationDensity.max" :step="controls.stationDensity.step" v-model.number="controls.stationDensity.value" :title="controls.stationDensity.value + '%'" />
+						</div>
+						<div v-if="controls.static.visible !== false" class="control-group">
+							<label for="presetSwitch" :title="controls.static.help">{{controls.static.label}} <span>{{staticLabel}}</span></label>
+							<div id="presetSwitch" class="tri-switch" role="group" aria-label="Static preset">
+								<button type="button" :title="controls.static.optionHelp.soft" :class="{active: controls.static.value === 'soft'}" @click="controls.static.value = 'soft'; updateStatic()">Soft</button>
+								<button type="button" :title="controls.static.optionHelp.medium" :class="{active: controls.static.value === 'medium'}" @click="controls.static.value = 'medium'; updateStatic()">Medium</button>
+								<button type="button" :title="controls.static.optionHelp.hard" :class="{active: controls.static.value === 'hard'}" @click="controls.static.value = 'hard'; updateStatic()">Hard</button>
+							</div>
 						</div>
 					</div>
-					<div v-if="controls.chunking.visible !== false" class="control-group">
-						<label for="chunkingSlider" :title="controls.chunking.help">{{controls.chunking.label}} <span>{{chunkingLabel}}</span></label>
-						<input id="chunkingSlider" type="range" :min="controls.chunking.min" :max="controls.chunking.max" :step="controls.chunking.step" v-model.number="controls.chunking.value" :title="'Chunking ' + chunkingLabel" @input="updateChunking" @change="updateChunking" />
-						<div class="tri-hints"><span>Off</span><span>750</span><span>1500</span></div>
-					</div>
-					<div v-if="controls.static.visible !== false" class="control-group">
-						<label for="presetSwitch" :title="controls.static.help">{{controls.static.label}} <span>{{staticLabel}}</span></label>
-						<div id="presetSwitch" class="tri-switch" role="group" aria-label="Static preset">
-							<button type="button" :title="controls.static.optionHelp.soft" :class="{active: controls.static.value === 'soft'}" @click="controls.static.value = 'soft'; updateStatic()">Soft</button>
-							<button type="button" :title="controls.static.optionHelp.medium" :class="{active: controls.static.value === 'medium'}" @click="controls.static.value = 'medium'; updateStatic()">Medium</button>
-							<button type="button" :title="controls.static.optionHelp.hard" :class="{active: controls.static.value === 'hard'}" @click="controls.static.value = 'hard'; updateStatic()">Hard</button>
+					<div class="control-column control-column-right">
+						<div v-if="controls.hopIntervalMs.visible !== false" class="control-group">
+							<label for="switchSlider" :title="controls.hopIntervalMs.help">{{controls.hopIntervalMs.label}} <span>{{controls.hopIntervalMs.value}}ms</span></label>
+							<input id="switchSlider" type="range" :min="controls.hopIntervalMs.min" :max="controls.hopIntervalMs.max" :step="controls.hopIntervalMs.step" v-model.number="controls.hopIntervalMs.value" :title="controls.hopIntervalMs.value + 'ms'" @change="retune" />
+						</div>
+						<div v-if="controls.chunking.visible !== false" class="control-group">
+							<label for="chunkingSlider" :title="controls.chunking.help">{{controls.chunking.label}} <span>{{chunkingLabel}}</span></label>
+							<input id="chunkingSlider" type="range" :min="controls.chunking.min" :max="controls.chunking.max" :step="controls.chunking.step" v-model.number="controls.chunking.value" :title="'Chunking ' + chunkingLabel" @input="updateChunking" @change="updateChunking" />
+							<div class="tri-hints"><span>Off</span><span>750</span><span>1500</span></div>
+						</div>
+						<div v-if="controls.jitterMs.visible !== false" class="control-group">
+							<label for="jitterSlider" :title="controls.jitterMs.help">{{controls.jitterMs.label}} <span>+/-{{controls.jitterMs.value}}ms</span></label>
+							<input id="jitterSlider" type="range" :min="controls.jitterMs.min" :max="controls.jitterMs.max" :step="controls.jitterMs.step" v-model.number="controls.jitterMs.value" :title="'+/-' + controls.jitterMs.value + 'ms'" @change="retune" />
+						</div>
+						<div v-if="controls.motion.visible !== false" class="control-group">
+							<label for="sliderMotionSwitch" :title="controls.motion.help">{{controls.motion.label}} <span>{{motionLabel}}</span></label>
+							<div id="sliderMotionSwitch" class="tri-switch dual-switch" role="group" aria-label="Slider motion mode">
+								<button type="button" :title="controls.motion.optionHelp.random" :class="{active: controls.motion.value === 'random'}" @click="controls.motion.value = 'random'; updateMotion()">Random</button>
+								<button type="button" :title="controls.motion.optionHelp.sweep" :class="{active: controls.motion.value === 'sweep'}" @click="controls.motion.value = 'sweep'; updateMotion()">Sweep</button>
+							</div>
 						</div>
 					</div>
 				</div>

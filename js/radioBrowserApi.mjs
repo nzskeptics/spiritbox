@@ -1,13 +1,13 @@
 export const RADIO_BROWSER_API_BASE = 'https://all.api.radio-browser.info/json';
 export const RADIO_BROWSER_DEFAULT_LIMIT = 200;
-export const RADIO_BROWSER_CODEC_ALLOWLIST = Object.freeze(['mp3', 'aac', 'aac+']);
+export const RADIO_BROWSER_CODEC_ALLOWLIST = Object.freeze(['mp3', 'mpeg', 'aac', 'aac+', 'aacp', 'ogg', 'opus', 'flac']);
 export const RADIO_BROWSER_DEFAULT_TIMEOUT_MS = 10000;
 export const RADIO_BROWSER_DEFAULT_RETRIES = 2;
 export const RADIO_BROWSER_DEFAULT_RETRY_DELAY_MS = 350;
 
 export function createRadioBrowserSearchUrl(base = RADIO_BROWSER_API_BASE, options = {}) {
 	const {
-		tag = 'talk',
+		tag = '',
 		order = 'votes',
 		reverse = true,
 		hidebroken = true,
@@ -17,7 +17,6 @@ export function createRadioBrowserSearchUrl(base = RADIO_BROWSER_API_BASE, optio
 	} = options;
 
 	const params = new URLSearchParams({
-		tag,
 		order,
 		reverse: String(reverse),
 		hidebroken: String(hidebroken),
@@ -25,6 +24,7 @@ export function createRadioBrowserSearchUrl(base = RADIO_BROWSER_API_BASE, optio
 		limit: String(limit),
 		offset: String(offset),
 	});
+	if (tag) params.set('tag', tag);
 
 	return `${base}/stations/search?${params.toString()}`;
 }
@@ -35,15 +35,15 @@ export function normalizeRemoteStations(items, options = {}) {
 	const seen = new Set();
 	const out = [];
 	for (const station of items) {
-		const url = station?.url_resolved;
+		const url = station?.url_resolved || station?.url;
 		if (!url || seen.has(url)) continue;
 		const codec = (station.codec || '').toLowerCase();
-		if (!allowedCodecs.has(codec)) continue;
+		if (codec && !allowedCodecs.has(codec)) continue;
 		seen.add(url);
 		out.push({
 			name: station.name,
 			website: station.homepage || station.url || station.url_resolved,
-			url: station.url_resolved,
+			url,
 		});
 	}
 	return out;
