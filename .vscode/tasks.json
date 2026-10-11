@@ -1,0 +1,132 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Rebuild stations fallback",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js"
+			]
+		},
+		{
+			"label": "Smoke test mirrors",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=1",
+				"--limit=5",
+				"--concurrency=2"
+			]
+		},
+		{
+			"label": "Diagnose mirror connectivity",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"-e",
+				"const dns=require('dns').promises; const targets=['all.api.radio-browser.info','de1.api.radio-browser.info']; (async()=>{ for(const host of targets){ try{ const a=await dns.resolve4(host); console.log(host,'A',a); }catch(e){ console.log(host,'A_ERR',e.code||e.message); } try{ const aaaa=await dns.resolve6(host); console.log(host,'AAAA',aaaa); }catch(e){ console.log(host,'AAAA_ERR',e.code||e.message); } } const urls=['https://all.api.radio-browser.info/json/stations/search?limit=1','https://de1.api.radio-browser.info/json/stations/search?limit=1']; for(const url of urls){ try{ const r=await fetch(url,{headers:{accept:'application/json'}}); console.log('FETCH_OK',url,r.status); const t=await r.text(); console.log('BODY_HEAD',t.slice(0,120).replace(/\\s+/g,' ')); }catch(e){ console.log('FETCH_ERR',url,e.name,e.code||'',e.message); if(e.cause) console.log('CAUSE',e.cause.code||'',e.cause.message||String(e.cause)); } } })();"
+			]
+		},
+		{
+			"label": "Run mirror diagnostics",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./diagnose-mirrors.js"
+			]
+		},
+		{
+			"label": "Smoke test mirror diagnostics v2",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=1",
+				"--limit=5",
+				"--concurrency=2"
+			]
+		},
+		{
+			"label": "Check WSL network path",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"echo '--- proxy env ---'; env | grep -i 'proxy' || true; echo '--- curl test ---'; curl -I --max-time 6 'https://de1.api.radio-browser.info/json/stations/search?limit=1' || true"
+			]
+		},
+		{
+			"label": "Check WSL network path v2",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"echo \"--- proxy env ---\"; env | grep -i proxy || true; echo \"--- curl test ---\"; curl -I --max-time 6 \"https://de1.api.radio-browser.info/json/stations/search?limit=1\" || true"
+			]
+		},
+		{
+			"label": "WSL proxy env",
+			"type": "shell",
+			"command": "env | grep -i proxy"
+		},
+		{
+			"label": "WSL proxy env v2",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"env | grep -i proxy"
+			]
+		},
+		{
+			"label": "Smoke test ipv4 mirror fetch",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=1",
+				"--limit=5",
+				"--concurrency=2"
+			]
+		},
+		{
+			"label": "Smoke test no-deps generator",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=1",
+				"--limit=5",
+				"--concurrency=2"
+			]
+		},
+		{
+			"label": "Generate 1000 stations",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=80",
+				"--limit=1000",
+				"--concurrency=24",
+				"--timeout=3500",
+				"--retries=0"
+			]
+		},
+		{
+			"label": "Generate 1000 stations broad query",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=30",
+				"--limit=1000",
+				"--concurrency=24",
+				"--timeout=3500",
+				"--retries=0"
+			]
+		}
+	]
+}

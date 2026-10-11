@@ -45,6 +45,11 @@ function isApiOrStreamRequest(request) {
 	return false;
 }
 
+function isLocalDataRequest(request) {
+	const url = new URL(request.url);
+	return url.origin === self.location.origin && url.pathname.endsWith('/stations.json');
+}
+
 async function networkFirst(request, cacheName) {
 	const cache = await caches.open(cacheName);
 	try {
@@ -83,6 +88,11 @@ self.addEventListener('fetch', (event) => {
 
 	if (isApiOrStreamRequest(request)) {
 		event.respondWith(fetch(request));
+		return;
+	}
+
+	if (isLocalDataRequest(request)) {
+		event.respondWith(networkFirst(request, APP_SHELL_CACHE));
 		return;
 	}
 

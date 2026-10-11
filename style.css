@@ -362,7 +362,7 @@ form::after {
 	letter-spacing: 0.08em;
 }
 
-#bar {
+.bar {
 	margin: 0.35rem 0;
 	padding: 0.18rem 0.35rem;
 	font-family: "Courier New", Courier, monospace;

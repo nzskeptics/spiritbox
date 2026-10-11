@@ -407,6 +407,11 @@ function buildRuntimeState() {
 			allStations: null,
 			retuneTimer: null,
 			play: false,
+			pendingPlay: false,
+			streamHealth: {
+				failuresByUrl: Object.create(null),
+				blockedUrls: Object.create(null),
+			},
 		},
 		sweep: {
 			cursor: 0,
@@ -489,6 +494,85 @@ const SPIRIT_APP_METHODS = {
 		const playPromise = audio.play?.();
 		if (playPromise?.catch) playPromise.catch(() => {});
 	},
+	getStationAt(index) {
+		return this.runtime.allStations?.[index] ?? null;
+	},
+	getActiveStationUrls() {
+		const active = new Set();
+		for (let i = 0; i < this.controls.stations.value; i++) {
+			const station = this.getStationAt(i);
+			if (!station?.url) continue;
+			active.add(station.url);
+		}
+		return active;
+	},
+	bindAudioHealthHandlers() {
+		for (const i of this.stations.keys()) {
+			const audio = this.getAudio(i);
+			if (!audio || audio.dataset.healthBound === '1') continue;
+			audio.dataset.healthBound = '1';
+			audio.addEventListener('error', () => {
+				const index = Number.parseInt(audio.dataset.audioIndex || String(i), 10);
+				if (!Number.isFinite(index)) return;
+				this.handleStationFailure(index, 'audio-error');
+			});
+			audio.addEventListener('playing', () => {
+				const index = Number.parseInt(audio.dataset.audioIndex || String(i), 10);
+				if (!Number.isFinite(index)) return;
+				const station = this.getStationAt(index);
+				if (!station?.url) return;
+				delete this.runtime.streamHealth.failuresByUrl[station.url];
+				delete this.runtime.streamHealth.blockedUrls[station.url];
+			});
+		}
+	},
+	replaceStationAtIndex(index) {
+		const failedStation = this.getStationAt(index);
+		if (!failedStation?.url || !this.runtime.allStations?.length) return false;
+		const activeUrls = this.getActiveStationUrls();
+		const blocked = this.runtime.streamHealth.blockedUrls;
+		const activeCount = this.controls.stations.value;
+		let replacementIndex = -1;
+		for (let i = activeCount; i < this.runtime.allStations.length; i++) {
+			const candidate = this.runtime.allStations[i];
+			if (!candidate?.url) continue;
+			if (blocked[candidate.url]) continue;
+			if (activeUrls.has(candidate.url)) continue;
+			replacementIndex = i;
+			break;
+		}
+		if (replacementIndex === -1) return false;
+		[this.runtime.allStations[index], this.runtime.allStations[replacementIndex]] = [
+			this.runtime.allStations[replacementIndex],
+			this.runtime.allStations[index],
+		];
+		if (this.runtime.play) {
+			queueMicrotask(() => {
+				this.bindAudioHealthHandlers();
+				this.refreshStreamWarmPool(this.runtime.index);
+				if (!this.static.active && this.runtime.index === index) this.unmute(index);
+			});
+		}
+		return true;
+	},
+	handleStationFailure(index, reason = 'unknown') {
+		if (!this.runtime.play) return;
+		if (!Number.isInteger(index) || index < 0) return;
+		const station = this.getStationAt(index);
+		if (!station?.url) return;
+		const failuresByUrl = this.runtime.streamHealth.failuresByUrl;
+		const blockedUrls = this.runtime.streamHealth.blockedUrls;
+		failuresByUrl[station.url] = (failuresByUrl[station.url] || 0) + 1;
+		const failures = failuresByUrl[station.url];
+		if (failures < 2) return;
+		blockedUrls[station.url] = true;
+		const replaced = this.replaceStationAtIndex(index);
+		if (!replaced) {
+			console.warn(`Station failed (${reason}) and no replacement available:`, station.url);
+			return;
+		}
+		console.warn(`Station replaced after ${failures} failures (${reason}):`, station.url);
+	},
 	clearRetuneTimer() {
 		clearTimeout(this.runtime.retuneTimer);
 		this.runtime.retuneTimer = null;
@@ -503,6 +587,10 @@ const SPIRIT_APP_METHODS = {
 			this.sweep.cursor = 0;
 		}
 		this.syncNeedle();
+		if (this.runtime.pendingPlay && !this.runtime.play && this.runtime.allStations?.length) {
+			this.runtime.pendingPlay = false;
+			this.playPause();
+		}
 	},
 	rebuildStationBand() {
 		this.sweep.stationBandPositions = buildStationBandPositions(this.stations.length);
@@ -553,6 +641,7 @@ const SPIRIT_APP_METHODS = {
 		} catch (error) {
 			console.error('Failed to load stations from remote API and stations.json', error);
 			this.runtime.allStations = [];
+			this.runtime.pendingPlay = false;
 		}
 	},
 	syncNeedle() {
@@ -1238,6 +1327,7 @@ const SPIRIT_APP_METHODS = {
 		this.playSilently(audio);
 	},
 	startAllStreams() {
+		this.bindAudioHealthHandlers();
 		this.refreshStreamWarmPool(this.runtime.index);
 	},
 	stopAllStreams() {
@@ -1252,6 +1342,18 @@ const SPIRIT_APP_METHODS = {
 			audio.volume = 0;
 			audio.pause?.();
 		}
+	},
+	startPlaybackSoon() {
+		const boot = () => {
+			if (!this.runtime.play) return;
+			this.ensureAudioContext();
+			this.startAllStreams();
+			this.playNextSelection();
+			this.retune();
+			this.refreshChunkingTimer();
+			this.updateMicroMute();
+		};
+		requestAnimationFrame(() => requestAnimationFrame(boot));
 	},
 	unmute(index) {
 		if (!this.runtime.play || !this.stations.length) return;
@@ -1288,6 +1390,7 @@ const SPIRIT_APP_METHODS = {
 		this.syncNeedle();
 		if (this.runtime.play) {
 			queueMicrotask(() => {
+				this.bindAudioHealthHandlers();
 				this.startAllStreams();
 				if (this.static.active) this.playStatic();
 				else this.unmute(this.runtime.index);
@@ -1305,8 +1408,13 @@ const SPIRIT_APP_METHODS = {
 		this.runtime.allStations = shuffled;
 	},
 	playPause() {
-		if (!this.runtime.allStations?.length) return;
+		if (!this.runtime.allStations?.length) {
+			this.runtime.pendingPlay = true;
+			this.loadStations();
+			return;
+		}
 		if (this.runtime.play) {
+			this.runtime.pendingPlay = false;
 			this.clearRetuneTimer();
 			this.clearChunkTimer();
 			this.clearMicroMuteTimer();
@@ -1322,14 +1430,7 @@ const SPIRIT_APP_METHODS = {
 			this.sweep.bandIndex = 0;
 			this.sweep.currentBandIndex = 0;
 		}
-		queueMicrotask(() => {
-			this.ensureAudioContext();
-			this.startAllStreams();
-			this.playNextSelection();
-			this.retune();
-			this.refreshChunkingTimer();
-			this.updateMicroMute();
-		});
+		this.startPlaybackSoon();
 	},
 	mounted() {
 		this.updateMotion();
