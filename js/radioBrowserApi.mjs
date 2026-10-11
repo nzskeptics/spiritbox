@@ -69,14 +69,15 @@ export async function fetchRadioBrowserStations(options = {}) {
 		limit = RADIO_BROWSER_DEFAULT_LIMIT,
 		offset = 0,
 		timeoutMs = RADIO_BROWSER_DEFAULT_TIMEOUT_MS,
-		retries = RADIO_BROWSER_DEFAULT_RETRIES,
-		retryDelayMs = RADIO_BROWSER_DEFAULT_RETRY_DELAY_MS,
+		retry = {},
 		requestInit = {},
 	} = options;
+	const resolvedRetries = retry.count ?? RADIO_BROWSER_DEFAULT_RETRIES;
+	const resolvedRetryDelayMs = retry.delayMs ?? RADIO_BROWSER_DEFAULT_RETRY_DELAY_MS;
 
 	const url = createRadioBrowserSearchUrl(base, {limit, offset});
 	let lastError = null;
-	for (let attempt = 0; attempt <= retries; attempt++) {
+	for (let attempt = 0; attempt <= resolvedRetries; attempt++) {
 		try {
 			const response = await fetchWithTimeout(url, {
 				method: 'GET',
@@ -94,8 +95,8 @@ export async function fetchRadioBrowserStations(options = {}) {
 			};
 		} catch (error) {
 			lastError = error;
-			if (attempt < retries) {
-				await delay(retryDelayMs);
+			if (attempt < resolvedRetries) {
+				await delay(resolvedRetryDelayMs);
 			}
 		}
 	}
@@ -109,8 +110,7 @@ export async function fetchRadioBrowserStationsWithFailover(options = {}) {
 		limit = RADIO_BROWSER_DEFAULT_LIMIT,
 		offset = 0,
 		timeoutMs = RADIO_BROWSER_DEFAULT_TIMEOUT_MS,
-		retries = RADIO_BROWSER_DEFAULT_RETRIES,
-		retryDelayMs = RADIO_BROWSER_DEFAULT_RETRY_DELAY_MS,
+		retry = {},
 		requestInit = {},
 		onMirrorError,
 	} = options;
@@ -123,8 +123,7 @@ export async function fetchRadioBrowserStationsWithFailover(options = {}) {
 				limit,
 				offset,
 				timeoutMs,
-				retries,
-				retryDelayMs,
+				retry,
 				requestInit,
 			});
 			return result;
@@ -133,7 +132,7 @@ export async function fetchRadioBrowserStationsWithFailover(options = {}) {
 			if (typeof onMirrorError === 'function') {
 				onMirrorError(error, base);
 			}
-		}
+	}
 	}
 
 	throw lastError || new Error('No Radio Browser mirror available');

@@ -113,6 +113,17 @@ function getStaticLevelBounds() {
 	};
 }
 
+function getStationBedRelativeBounds() {
+	const configured = APP_CONFIG.audio.static.volume.stationBedRelative;
+	if (typeof configured === 'number') {
+		const fixed = clampValue(configured, 0, 1);
+		return {min: fixed, max: fixed};
+	}
+	const min = clampValue(configured?.min ?? 0.03, 0, 1);
+	const max = Math.max(min, clampValue(configured?.max ?? min, 0, 1));
+	return {min, max};
+}
+
 function randomBetween(min, max) {
 	if (max <= min) return min;
 	return min + Math.random() * (max - min);
@@ -129,20 +140,81 @@ function varyTone(center, halfSpread, variance, min, max) {
 
 function getStaticDriftConfig() {
 	const cfg = APP_CONFIG.audio.static.drift;
-	const stepMin = clampValue(cfg.stepMin, 0, 1);
-	const stepMax = Math.max(stepMin, clampValue(cfg.stepMax, 0, 1));
+	const stepMin = clampValue(cfg.step?.min ?? 0.005, 0, 1);
+	const stepMax = Math.max(stepMin, clampValue(cfg.step?.max ?? stepMin, 0, 1));
 	return {
-		stepMin,
-		stepMax,
+		step: {
+			min: stepMin,
+			max: stepMax,
+		},
 		accel: clampValue(cfg.accel, 0, 1),
 		flipChance: clampValue(cfg.flipChance, 0, 1),
 	};
 }
 
-function getChunkIntervalBounds() {
-	const min = Math.max(0, Number(APP_CONFIG.audio.static.chunking.interval.minMs) || 0);
-	const max = Math.max(min, Number(APP_CONFIG.audio.static.chunking.interval.maxMs) || min);
+function getFrequencyRepeatsRange() {
+	const cfg = APP_CONFIG.radio.tuning.frequencyBand;
+	const min = Math.max(1, Number(cfg.repeats?.min ?? cfg.repeatsMin ?? 2) || 2);
+	const max = Math.max(min, Number(cfg.repeats?.max ?? cfg.repeatsMax ?? min) || min);
 	return {min, max};
+}
+
+function getScanBiasHoldStepsRange() {
+	const cfg = APP_CONFIG.radio.tuning.scanBias;
+	const min = Math.max(1, Number(cfg.holdSteps?.min ?? cfg.holdStepsMin ?? 4) || 4);
+	const max = Math.max(min, Number(cfg.holdSteps?.max ?? cfg.holdStepsMax ?? min) || min);
+	return {min, max};
+}
+
+function getChunkIntervalBounds() {
+	const interval = APP_CONFIG.audio.static.chunking.interval || {};
+	const min = Math.max(0, Number(interval.minMs ?? interval.min) || 0);
+	const max = Math.max(min, Number(interval.maxMs ?? interval.max) || min);
+	return {min, max};
+}
+
+function getMicroMuteConfig() {
+	const cfg = APP_CONFIG.audio.static.microMute || {};
+	const intervalMinMs = Number(cfg.interval?.minMs ?? cfg.interval?.min ?? cfg.intervalMinMs ?? 2500) || 2500;
+	const intervalMaxMs = Number(cfg.interval?.maxMs ?? cfg.interval?.max ?? cfg.intervalMaxMs ?? intervalMinMs) || intervalMinMs;
+	const durationMinMs = Number(cfg.duration?.minMs ?? cfg.duration?.min ?? cfg.durationMinMs ?? 24) || 24;
+	const durationMaxMs = Number(cfg.duration?.maxMs ?? cfg.duration?.max ?? cfg.durationMaxMs ?? durationMinMs) || durationMinMs;
+	const duckMin = Number(cfg.duck?.min ?? cfg.duckMin ?? 0.22) || 0.22;
+	const duckMax = Number(cfg.duck?.max ?? cfg.duckMax ?? duckMin) || duckMin;
+	return {
+		enabled: cfg.enabled !== false,
+		interval: {
+			minMs: Math.max(0, intervalMinMs),
+			maxMs: Math.max(Math.max(0, intervalMinMs), intervalMaxMs),
+		},
+		duration: {
+			minMs: Math.max(1, durationMinMs),
+			maxMs: Math.max(Math.max(1, durationMinMs), durationMaxMs),
+		},
+		duck: {
+			min: clampValue(duckMin, 0, 1),
+			max: clampValue(Math.max(duckMin, duckMax), 0, 1),
+		},
+	};
+}
+
+function getWordWindowTiming() {
+	const cfg = APP_CONFIG.audio.static.wordWindow || {};
+	const timing = cfg.timing || {};
+	return {
+		preMs: Math.max(0, Number(timing.preMs ?? cfg.preMs ?? 55) || 55),
+		postMs: Math.max(0, Number(timing.postMs ?? cfg.postMs ?? 130) || 130),
+		recoverMs: Math.max(1, Number(timing.recoverMs ?? cfg.recoverMs ?? 120) || 120),
+	};
+}
+
+function getHumWander() {
+	const cfg = APP_CONFIG.audio.static.hum || {};
+	const wander = cfg.wander || {};
+	return {
+		hz: Math.max(0, Number(wander.hz ?? cfg.wanderHz ?? 0.12) || 0.12),
+		depthHz: Math.max(0, Number(wander.depthHz ?? cfg.wanderDepthHz ?? 1.2) || 1.2),
+	};
 }
 
 function normalizeOptionValue(value, options, fallback) {
@@ -197,8 +269,9 @@ function buildSweepBandSlots(stationCount, stationBandPositions) {
 	const baseResolution = Math.max(24, Number(APP_CONFIG.radio.tuning.frequencyBand.resolution) || 180);
 	const resolution = Math.max(baseResolution, stationCount * 10);
 	const minSepBins = Math.max(1, Math.round(clampValue(APP_CONFIG.radio.tuning.frequencyBand.minStationSeparation, 0, 1) * resolution));
-	const repeatsMin = Math.max(1, Number(APP_CONFIG.radio.tuning.frequencyBand.repeatsMin) || 2);
-	const repeatsMax = Math.max(repeatsMin, Number(APP_CONFIG.radio.tuning.frequencyBand.repeatsMax) || 4);
+	const repeatsRange = getFrequencyRepeatsRange();
+	const repeatsMin = repeatsRange.min;
+	const repeatsMax = repeatsRange.max;
 	const slots = Array.from({length: resolution}, () => -1);
 	const occurrences = [];
 
@@ -272,13 +345,17 @@ async function getStationsFromRadioBrowser(limit) {
 
 	for (const offset of offsets) {
 		try {
+			const request = APP_CONFIG.radio.request || {};
+			const retry = request.retry || {};
 			const result = await fetchRadioBrowserStationsWithFailover({
 				bases: APP_CONFIG.radio.bases,
 				limit: safeLimit,
 				offset,
-				timeoutMs: APP_CONFIG.radio.request.timeoutMs,
-				retries: APP_CONFIG.radio.request.retries,
-				retryDelayMs: APP_CONFIG.radio.request.retryDelayMs,
+				timeoutMs: request.timeoutMs,
+				retry: {
+					count: retry.count ?? 2,
+					delayMs: retry.delayMs ?? 350,
+				},
 			});
 			for (const station of result.stations) {
 				if (seenUrls.has(station.url)) continue;
@@ -314,10 +391,16 @@ function buildUiState() {
 					chunk: configuredNeedleMode.chunk === 'slide' ? 'slide' : 'jump',
 				},
 				transitions: {
-					stationToStationMs: transitions.stationToStationMs,
-					stationToStaticMs: transitions.stationToStaticMs,
-					staticToStationMs: transitions.staticToStationMs,
-					volumeRampMs: transitions.volumeRampMs,
+					station: {
+						toStationMs: transitions.station?.toStationMs ?? 520,
+						toStaticMs: transitions.station?.toStaticMs ?? 720,
+					},
+					static: {
+						toStationMs: transitions.static?.toStationMs ?? 880,
+					},
+					volume: {
+						rampMs: transitions.volume?.rampMs ?? 180,
+					},
 					keepStaticEngineWarm: transitions.keepStaticEngineWarm,
 				},
 			},
@@ -361,6 +444,7 @@ function buildStaticState() {
 		static: {
 			active: false,
 			position: 0,
+			stationBedRelative: null,
 			node: null,
 			filter: null,
 			gain: null,
@@ -803,8 +887,14 @@ const SPIRIT_APP_METHODS = {
 			crackleChance: varyTone(0.0018 + Math.abs(driftScaled) * 0.00045, 0.0006, toneVariance, 0.0005, 0.0034),
 		};
 	},
+	pickStationBedRelative(forceNew = false) {
+		if (!forceNew && Number.isFinite(this.static.stationBedRelative)) return this.static.stationBedRelative;
+		const {min, max} = getStationBedRelativeBounds();
+		this.static.stationBedRelative = randomBetween(min, max);
+		return this.static.stationBedRelative;
+	},
 	stationBedStaticTarget() {
-		const relative = clampValue(APP_CONFIG.audio.static.volume.stationBedRelative, 0, 1);
+		const relative = this.pickStationBedRelative();
 		return this.clampVolume((this.controls.volume.value / 100) * relative);
 	},
 	setStaticHumTarget() {
@@ -816,8 +906,9 @@ const SPIRIT_APP_METHODS = {
 		if (!APP_CONFIG.audio.static.hum.enabled || !this.static.hum.osc.A || !this.static.hum.osc.B) return;
 		const context = getAudioContext();
 		const now = context.currentTime;
-		this.static.hum.phase += randomBetween(0.6, 1.4) * APP_CONFIG.audio.static.hum.wanderHz;
-		const wobble = Math.sin(this.static.hum.phase) * APP_CONFIG.audio.static.hum.wanderDepthHz;
+		const wander = getHumWander();
+		this.static.hum.phase += randomBetween(0.6, 1.4) * wander.hz;
+		const wobble = Math.sin(this.static.hum.phase) * wander.depthHz;
 		this.static.hum.osc.A.frequency.setTargetAtTime(APP_CONFIG.audio.static.hum.baseHz + wobble, now, 0.2);
 		this.static.hum.osc.B.frequency.setTargetAtTime(APP_CONFIG.audio.static.hum.overtoneHz + wobble * 0.85, now, 0.24);
 	},
@@ -863,7 +954,8 @@ const SPIRIT_APP_METHODS = {
 	resetScanRun() {
 		if (!APP_CONFIG.radio.tuning.scanBias.enabled) return;
 		if (Math.random() < APP_CONFIG.radio.tuning.scanBias.reverseChance) this.static.scan.direction *= -1;
-		this.static.scan.runRemaining = Math.floor(randomBetween(APP_CONFIG.radio.tuning.scanBias.holdStepsMin, APP_CONFIG.radio.tuning.scanBias.holdStepsMax + 1));
+		const holdSteps = getScanBiasHoldStepsRange();
+		this.static.scan.runRemaining = Math.floor(randomBetween(holdSteps.min, holdSteps.max + 1));
 	},
 	nextScanIndex(count) {
 		if (!APP_CONFIG.radio.tuning.scanBias.enabled || count <= 1) return null;
@@ -878,7 +970,7 @@ const SPIRIT_APP_METHODS = {
 			this.static.tone.velocity *= -0.6;
 		}
 		this.static.tone.velocity += (Math.random() * 2 - 1) * driftCfg.accel;
-		const maxStep = randomBetween(driftCfg.stepMin, driftCfg.stepMax);
+		const maxStep = randomBetween(driftCfg.step.min, driftCfg.step.max);
 		this.static.tone.velocity = clampValue(this.static.tone.velocity, -maxStep, maxStep);
 		this.static.tone.drift = clampValue(this.static.tone.drift + this.static.tone.velocity, -1, 1);
 	},
@@ -897,7 +989,9 @@ const SPIRIT_APP_METHODS = {
 	},
 	applyChunkJump() {
 		const jumpAmount = clampValue(APP_CONFIG.audio.static.chunking.jumpAmount, 0, 1);
-		const target = randomBetween(-1, 1);
+		const edgeBias = clampValue(APP_CONFIG.audio.static.chunking.edgeBias ?? 0.65, 0, 1);
+		const targetMagnitude = randomBetween(edgeBias, 1);
+		const target = (Math.random() < 0.5 ? -1 : 1) * targetMagnitude;
 		this.static.tone.drift = clampValue(this.static.tone.drift + (target - this.static.tone.drift) * jumpAmount, -1, 1);
 		if (Math.random() < 0.5) this.static.tone.velocity *= -0.5;
 		this.retuneStaticTexture(false);
@@ -941,6 +1035,7 @@ const SPIRIT_APP_METHODS = {
 		);
 		const presetName = this.controls.static.value;
 		if (!applyStaticPreset(APP_CONFIG, presetName)) return;
+		this.pickStationBedRelative(true);
 		if (this.controls.chunking.value !== 0) this.updateChunking();
 		if (this.static.node && this.static.filter && this.static.gain) {
 			this.retuneStaticTexture(false);
@@ -951,9 +1046,9 @@ const SPIRIT_APP_METHODS = {
 	},
 	scheduleMicroMuteTick() {
 		this.clearMicroMuteTimer();
-		const cfg = APP_CONFIG.audio.static.microMute;
+		const cfg = getMicroMuteConfig();
 		if (!this.runtime.play || !cfg.enabled) return;
-		const waitMs = Math.floor(randomBetween(cfg.intervalMinMs, cfg.intervalMaxMs));
+		const waitMs = Math.floor(randomBetween(cfg.interval.minMs, cfg.interval.maxMs));
 		this.static.microMute.timer = setTimeout(() => {
 			if (!this.runtime.play || !cfg.enabled) {
 				this.clearMicroMuteTimer();
@@ -962,8 +1057,8 @@ const SPIRIT_APP_METHODS = {
 			const token = this.ui.runtime.fadeToken;
 			const baseTarget = this.static.active ? this.staticTargetGain() : this.stationBedStaticTarget();
 			const duck = {
-				factor: randomBetween(cfg.duckMin, cfg.duckMax),
-				durationMs: Math.floor(randomBetween(cfg.durationMinMs, cfg.durationMaxMs)),
+				factor: randomBetween(cfg.duck.min, cfg.duck.max),
+				durationMs: Math.floor(randomBetween(cfg.duration.minMs, cfg.duration.maxMs)),
 			};
 			duck.target = this.clampVolume(baseTarget * duck.factor);
 			this.fadeStaticGain(duck.target, Math.max(18, Math.floor(duck.durationMs * 0.35)), token);
@@ -975,7 +1070,7 @@ const SPIRIT_APP_METHODS = {
 		}, waitMs);
 	},
 	updateMicroMute() {
-		if (!this.runtime.play || !APP_CONFIG.audio.static.microMute.enabled) {
+		if (!this.runtime.play || !getMicroMuteConfig().enabled) {
 			this.clearMicroMuteTimer();
 			return;
 		}
@@ -984,22 +1079,23 @@ const SPIRIT_APP_METHODS = {
 	applyWordWindowBurst(token, baseTarget) {
 		const cfg = APP_CONFIG.audio.static.wordWindow;
 		if (!cfg.enabled || !this.static.gain) return;
+		const timing = getWordWindowTiming();
 		const duck = {
 			target: this.clampVolume(baseTarget * clampValue(cfg.duckRatio, 0, 1)),
 		};
-		this.fadeStaticGain(duck.target, Math.max(18, cfg.preMs), token);
+		this.fadeStaticGain(duck.target, Math.max(18, timing.preMs), token);
 		setTimeout(() => {
 			if (token !== this.ui.runtime.fadeToken || !this.static.gain) return;
-			this.fadeStaticGain(baseTarget, Math.max(30, cfg.recoverMs), token);
-		}, cfg.preMs);
+			this.fadeStaticGain(baseTarget, Math.max(30, timing.recoverMs), token);
+		}, timing.preMs);
 		setTimeout(() => {
 			if (token !== this.ui.runtime.fadeToken || !this.static.gain) return;
-			this.fadeStaticGain(duck.target, Math.max(18, Math.floor(cfg.preMs * 0.8)), token);
+			this.fadeStaticGain(duck.target, Math.max(18, Math.floor(timing.preMs * 0.8)), token);
 			setTimeout(() => {
 				if (token !== this.ui.runtime.fadeToken || !this.static.gain) return;
-				this.fadeStaticGain(baseTarget, Math.max(30, cfg.recoverMs), token);
-			}, Math.max(18, Math.floor(cfg.preMs * 0.8)));
-		}, cfg.postMs);
+				this.fadeStaticGain(baseTarget, Math.max(30, timing.recoverMs), token);
+			}, Math.max(18, Math.floor(timing.preMs * 0.8)));
+		}, timing.postMs);
 	},
 	getWarmStationIndexes(anchorIndex = this.runtime.index) {
 		const count = this.stations.length;
@@ -1241,7 +1337,7 @@ const SPIRIT_APP_METHODS = {
 		this.static.active = true;
 		this.static.position = this.chooseStaticPosition(targetIndex);
 		this.syncNeedle();
-		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.ui.needle.transitions.stationToStaticMs * 0.7)) : this.ui.needle.transitions.stationToStaticMs;
+		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.ui.needle.transitions.station.toStaticMs * 0.7)) : this.ui.needle.transitions.station.toStaticMs;
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, 0, fadeMs, token);
 		}
@@ -1262,18 +1358,19 @@ const SPIRIT_APP_METHODS = {
 		const wasStatic = this.static.active;
 		const token = this.beginTransition();
 		const targetVolume = this.clampVolume(this.controls.volume.value / 100);
+		this.pickStationBedRelative(true);
 		const staticBedTarget = this.stationBedStaticTarget();
 		this.static.active = false;
 		this.runtime.index = index;
 		this.syncNeedle();
 		this.refreshStreamWarmPool(index);
-		const fadeMs = wasStatic ? this.ui.needle.transitions.staticToStationMs : this.ui.needle.transitions.stationToStationMs;
+		const fadeMs = wasStatic ? this.ui.needle.transitions.static.toStationMs : this.ui.needle.transitions.station.toStationMs;
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, i === index ? targetVolume : 0, fadeMs, token);
 		}
 		const applyStaticBed = () => {
 			this.retuneStaticTexture();
-			this.fadeStaticGain(staticBedTarget, wasStatic ? fadeMs : this.ui.needle.transitions.stationToStationMs, token, false);
+			this.fadeStaticGain(staticBedTarget, wasStatic ? fadeMs : this.ui.needle.transitions.station.toStationMs, token, false);
 			this.setStaticHumTarget();
 			this.applyWordWindowBurst(token, staticBedTarget);
 		};
@@ -1370,16 +1467,16 @@ const SPIRIT_APP_METHODS = {
 		this.controls.volume.value = clampControl(this.controls.volume);
 		const token = this.beginTransition();
 		if (this.static.active && this.static.gain) {
-			this.fadeStaticGain(this.staticTargetGain(), this.ui.needle.transitions.volumeRampMs, token);
+			this.fadeStaticGain(this.staticTargetGain(), this.ui.needle.transitions.volume.rampMs, token);
 			this.setStaticHumTarget();
 			return;
 		}
 		if (this.static.gain) {
-			this.fadeStaticGain(this.stationBedStaticTarget(), this.ui.needle.transitions.volumeRampMs, token);
+			this.fadeStaticGain(this.stationBedStaticTarget(), this.ui.needle.transitions.volume.rampMs, token);
 			this.setStaticHumTarget();
 		}
 		for (const i of this.stations.keys()) {
-			this.fadeStation(i, i === this.runtime.index ? this.clampVolume(this.controls.volume.value / 100) : 0, this.ui.needle.transitions.volumeRampMs, token);
+			this.fadeStation(i, i === this.runtime.index ? this.clampVolume(this.controls.volume.value / 100) : 0, this.ui.needle.transitions.volume.rampMs, token);
 		}
 	},
 	updateStationCount() {
@@ -1421,6 +1518,7 @@ const SPIRIT_APP_METHODS = {
 			this.clearChunkTimer();
 			this.clearMicroMuteTimer();
 			this.stopAllStreams();
+			this.static.stationBedRelative = null;
 			this.runtime.play = false;
 			return;
 		}
