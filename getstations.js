@@ -26,7 +26,7 @@ try {
 
 function getSharedRadioBrowserApi() {
 	if (!radioBrowserApiPromise) {
-		radioBrowserApiPromise = import('./radioBrowserApi.mjs');
+		radioBrowserApiPromise = import('./js/radioBrowserApi.mjs');
 	}
 	return radioBrowserApiPromise;
 }
@@ -434,7 +434,7 @@ async function resolveRadioBrowserMirrors({sharedApi, cacheFile, probeTimeoutMs}
 
 async function getRadioBrowserServers() {
 	const sharedApi = await getSharedRadioBrowserApi();
-	const cacheFile = resolve(__dirname, 'radio-browser-mirrors.json');
+	const cacheFile = resolve(__dirname, 'data', 'radio-browser-mirrors.json');
 	const resolution = await resolveRadioBrowserMirrors({
 		sharedApi,
 		cacheFile,
@@ -589,7 +589,7 @@ async function getAll(options = {}) {
 		retryDelayMs = DEFAULTS.retryDelayMs,
 		concurrency = DEFAULTS.concurrency,
 	} = options;
-	const stationsFile = resolve(__dirname, 'stations.json');
+	const stationsFile = resolve(__dirname, 'data', 'stations.json');
 	const stations = [];
 	const radioBrowserServers = await getRadioBrowserServers();
 	console.log(`Radio Browser servers: ${radioBrowserServers.length}`);

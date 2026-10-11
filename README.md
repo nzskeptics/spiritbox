@@ -17,8 +17,8 @@ Then open the shown local URL in a browser.
 
 ## Station Sources
 
-- Default mode: pulls stations from Radio Browser using failover logic in [radioBrowserApi.mjs](radioBrowserApi.mjs).
-- Fallback mode: loads [stations.json](stations.json) if remote fetch fails.
+- Default mode: pulls stations from Radio Browser using failover logic in [js/radioBrowserApi.mjs](js/radioBrowserApi.mjs).
+- Fallback mode: loads [data/stations.json](data/stations.json) if remote fetch fails.
 - Force local file mode: add `?source=file` to the URL.
 
 To refresh the fallback file with a larger randomized pool (default target: 1000 tested stations):
@@ -39,7 +39,7 @@ Mirror handling for `getstations.js` is fully dynamic:
 
 - Discovers Radio Browser mirrors via DNS SRV, DNS reverse lookup, and the Radio Browser servers directory.
 - Probes discovered mirrors until one works, then uses that mirror first for station batches.
-- Stores mirror candidates and last known good mirror in [radio-browser-mirrors.json](radio-browser-mirrors.json) for fallback on later runs.
+- Stores mirror candidates and last known good mirror in [data/radio-browser-mirrors.json](data/radio-browser-mirrors.json) for fallback on later runs.
 
 ## Controls
 
@@ -55,11 +55,11 @@ Mirror handling for `getstations.js` is fully dynamic:
 - Crossfades between station-to-station and station-to-static transitions.
 - Optional static engine warm state to reduce startup clicks.
 - Prewarmed stream pool (limited count) to reduce audible gaps while keeping bandwidth in check.
-- Static generator prefers AudioWorklet ([noise-worklet.js](noise-worklet.js)) and falls back to ScriptProcessor when unavailable.
+- Static generator prefers AudioWorklet ([js/noise-worklet.js](js/noise-worklet.js)) and falls back to ScriptProcessor when unavailable.
 
 ## Config
 
-Main runtime knobs are centralized in `APP_CONFIG` in [spirit.config.js](spirit.config.js):
+Main runtime knobs are centralized in `APP_CONFIG` in [js/spirit.config.js](js/spirit.config.js):
 
 - `radio`: API request policy (limit, timeout, retries, delay)
 - `audio`: worklet path, prewarm count, fallback buffer size
@@ -71,7 +71,7 @@ Main runtime knobs are centralized in `APP_CONFIG` in [spirit.config.js](spirit.
 [sw.js](sw.js) uses split strategies:
 
 - Network-first for HTML/JS/CSS so code updates land quickly.
-- Network-first for local station data ([stations.json](stations.json)) so updates are picked up on refresh when online.
+- Network-first for local station data ([data/stations.json](data/stations.json)) so updates are picked up on refresh when online.
 - Stale-while-revalidate for runtime static assets.
 - No caching for live API/stream requests (Radio Browser + audio streams).
 

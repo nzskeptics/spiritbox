@@ -1,19 +1,20 @@
-const APP_SHELL_CACHE = 'spiritbox-shell-v3';
-const RUNTIME_CACHE = 'spiritbox-runtime-v3';
+const APP_SHELL_CACHE = 'spiritbox-shell-v4';
+const RUNTIME_CACHE = 'spiritbox-runtime-v4';
 const APP_SHELL_FILES = [
 	'./',
 	'./index.html',
-	'./reset.min.css',
-	'./style.css',
-	'./petite-vue.es.js',
-	'./spirit.js',
-	'./radioBrowserApi.mjs',
-	'./noise-worklet.js',
-	'./stations.json',
-	'./wood.jpg',
-	'./grille.jpg',
-	'./radio.jpg',
-	'./logo.svg',
+	'./css/reset.min.css',
+	'./css/style.css',
+	'./js/petite-vue.es.js',
+	'./js/spirit.js',
+	'./js/spirit.config.js',
+	'./js/radioBrowserApi.mjs',
+	'./js/noise-worklet.js',
+	'./data/stations.json',
+	'./assets/wood.jpg',
+	'./assets/grille.jpg',
+	'./assets/radio.jpg',
+	'./assets/logo.svg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -47,7 +48,7 @@ function isApiOrStreamRequest(request) {
 
 function isLocalDataRequest(request) {
 	const url = new URL(request.url);
-	return url.origin === self.location.origin && url.pathname.endsWith('/stations.json');
+	return url.origin === self.location.origin && url.pathname.endsWith('/data/stations.json');
 }
 
 async function networkFirst(request, cacheName) {

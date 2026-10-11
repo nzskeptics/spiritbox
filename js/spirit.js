@@ -1,4 +1,4 @@
-// import stations from './stations.json'
+// import stations from '../data/stations.json'
 // import {createApp} from 'https://unpkg.com/petite-vue?module';
 import {createApp} from './petite-vue.es.js';
 import {fetchRadioBrowserStationsWithFailover} from './radioBrowserApi.mjs';
@@ -628,18 +628,18 @@ const SPIRIT_APP_METHODS = {
 				this.applyStations(remote.stations);
 				return;
 			} catch (error) {
-				console.warn('Remote station load failed, falling back to stations.json:', error?.message || error);
+				console.warn('Remote station load failed, falling back to data/stations.json:', error?.message || error);
 			}
 		}
 		try {
-			const response = await fetch('./stations.json');
+				const response = await fetch('../data/stations.json');
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const json = await response.json();
 			this.applyStations(json);
 		} catch (error) {
-			console.error('Failed to load stations from remote API and stations.json', error);
+				console.error('Failed to load stations from remote API and data/stations.json', error);
 			this.runtime.allStations = [];
 			this.runtime.pendingPlay = false;
 		}

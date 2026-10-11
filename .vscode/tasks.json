@@ -127,6 +127,32 @@
 				"--timeout=3500",
 				"--retries=0"
 			]
+		},
+		{
+			"label": "Smoke test reorganized generator",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=1",
+				"--limit=5",
+				"--concurrency=2",
+				"--timeout=3500",
+				"--retries=0"
+			]
+		},
+		{
+			"label": "Restore 1000 stations after reorg",
+			"type": "shell",
+			"command": "node",
+			"args": [
+				"./getstations.js",
+				"--pages=30",
+				"--limit=1000",
+				"--concurrency=24",
+				"--timeout=3500",
+				"--retries=0"
+			]
 		}
 	]
 }
