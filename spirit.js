@@ -1,193 +1,8 @@
 // import stations from './stations.json'
 // import {createApp} from 'https://unpkg.com/petite-vue?module';
-import {createApp} from './petite-vue.es.js?v=20261028';
-import {RADIO_BROWSER_API_BASE, fetchRadioBrowserStationsWithFailover} from './radioBrowserApi.mjs';
-
-const APP_CONFIG = {
-	radio: {
-		bases: [RADIO_BROWSER_API_BASE],
-		query: {
-			offset: 0,
-			randomizeOffset: true,
-			totalTopStations: 1000,
-			pageSamplesPerLoad: 4,
-		},
-		request: {
-			timeoutMs: 10000,
-			retries: 2,
-			retryDelayMs: 350,
-		},
-		tuning: {
-			scanBias: {
-				enabled: true,
-				biasStrength: 0.75,
-				holdStepsMin: 4,
-				holdStepsMax: 12,
-				reverseChance: 0.35,
-			},
-		},
-	},
-	audio: {
-		engine: {
-			workletModule: './noise-worklet.js?v=20261028',
-			streamPrewarmCount: 3,
-			bufferSize: 4096,
-		},
-		static: {
-			preset: 'classic',
-			presets: {
-				conservative: {
-					volume: {relative: 0.18, variance: 0.02, stationBedRelative: 0.03},
-					tone: {variance: 0.2, wowFlutter: {enabled: true, depthHz: 8, speedHz: 0.14}},
-					drift: {stepMin: 0.003, stepMax: 0.014, accel: 0.006, flipChance: 0.1},
-					chunking: {enabledByDefault: true, interval: {minMs: 900, maxMs: 1800}, jumpAmount: 0.55},
-					microMute: {enabled: true, intervalMinMs: 3200, intervalMaxMs: 6200, durationMinMs: 20, durationMaxMs: 54, duckMin: 0.25, duckMax: 0.5},
-					hum: {enabled: true, relativeLevel: 0.07, wanderHz: 0.09, wanderDepthHz: 0.8},
-					wordWindow: {enabled: true, duckRatio: 0.6, preMs: 45, postMs: 110, recoverMs: 100},
-				},
-				classic: {
-					volume: {relative: 0.2, variance: 0.03, stationBedRelative: 0.04},
-					tone: {variance: 0.3, wowFlutter: {enabled: true, depthHz: 12, speedHz: 0.18}},
-					drift: {stepMin: 0.005, stepMax: 0.02, accel: 0.008, flipChance: 0.12},
-					chunking: {enabledByDefault: true, interval: {minMs: 750, maxMs: 1500}, jumpAmount: 0.7},
-					microMute: {enabled: true, intervalMinMs: 2500, intervalMaxMs: 5200, durationMinMs: 24, durationMaxMs: 68, duckMin: 0.22, duckMax: 0.45},
-					hum: {enabled: true, relativeLevel: 0.08, wanderHz: 0.12, wanderDepthHz: 1.2},
-					wordWindow: {enabled: true, duckRatio: 0.5, preMs: 55, postMs: 130, recoverMs: 120},
-				},
-				aggressive: {
-					volume: {relative: 0.24, variance: 0.05, stationBedRelative: 0.06},
-					tone: {variance: 0.45, wowFlutter: {enabled: true, depthHz: 18, speedHz: 0.24}},
-					drift: {stepMin: 0.008, stepMax: 0.03, accel: 0.012, flipChance: 0.18},
-					chunking: {enabledByDefault: true, interval: {minMs: 550, maxMs: 1200}, jumpAmount: 0.82},
-					microMute: {enabled: true, intervalMinMs: 1800, intervalMaxMs: 4200, durationMinMs: 28, durationMaxMs: 82, duckMin: 0.16, duckMax: 0.4},
-					hum: {enabled: true, relativeLevel: 0.1, wanderHz: 0.18, wanderDepthHz: 1.8},
-					wordWindow: {enabled: true, duckRatio: 0.42, preMs: 70, postMs: 170, recoverMs: 135},
-				},
-			},
-			volume: {
-				relative: 0.2,
-				variance: 0.03,
-				stationBedRelative: 0.04,
-			},
-			tone: {
-				variance: 0.3,
-				frequency: {
-					center: 980,
-					spread: 120,
-				},
-				q: {
-					center: 1.0,
-					spread: 0.22,
-				},
-				wowFlutter: {
-					enabled: true,
-					depthHz: 12,
-					speedHz: 0.18,
-				},
-			},
-			drift: {
-				stepMin: 0.005,
-				stepMax: 0.02,
-				accel: 0.008,
-				flipChance: 0.12,
-			},
-			chunking: {
-				enabledByDefault: true,
-				interval: {
-					minMs: 750,
-					maxMs: 1500,
-				},
-				jumpAmount: 0.7,
-				uiRange: {
-					min: 250,
-					max: 2500,
-					step: 50,
-				},
-			},
-			microMute: {
-				enabled: true,
-				intervalMinMs: 2500,
-				intervalMaxMs: 5200,
-				durationMinMs: 24,
-				durationMaxMs: 68,
-				duckMin: 0.22,
-				duckMax: 0.45,
-			},
-			hum: {
-				enabled: true,
-				baseHz: 58,
-				overtoneHz: 116,
-				relativeLevel: 0.08,
-				wanderHz: 0.12,
-				wanderDepthHz: 1.2,
-			},
-			wordWindow: {
-				enabled: true,
-				duckRatio: 0.5,
-				preMs: 55,
-				postMs: 130,
-				recoverMs: 120,
-			},
-		},
-	},
-	controls: {
-		volume: {
-			min: 0,
-			max: 100,
-			step: 1,
-			default: 50,
-			visible: true,
-		},
-		stations: {
-			min: 4,
-			max: 20,
-			default: 10,
-			visible: true,
-		},
-		hopIntervalMs: {
-			min: 50,
-			max: 500,
-			step: 50,
-			default: 100,
-			visible: true,
-		},
-		stationDensity: {
-			min: 0,
-			max: 100,
-			step: 5,
-			default: 20,
-			visible: true,
-		},
-		jitterMs: {
-			min: 0,
-			max: 200,
-			step: 5,
-			default: 0,
-			visible: false,
-		},
-		chunkMode: {
-			visible: true,
-		},
-		staticPreset: {
-			visible: true,
-		},
-		sliderMotion: {
-			default: 1,
-			visible: true,
-		},
-	},
-	ui: {
-		// step = instant jumps, smooth = CSS easing, analog = eased + slight wobble
-		needleMotion: 'analog',
-		transitions: {
-			stationToStationMs: 520,
-			stationToStaticMs: 720,
-			staticToStationMs: 880,
-			volumeRampMs: 180,
-			keepStaticEngineWarm: true,
-		},
-	},
-};
+import {createApp} from './petite-vue.es.js';
+import {fetchRadioBrowserStationsWithFailover} from './radioBrowserApi.mjs';
+import {APP_CONFIG} from './spirit.config.js';
 
 function applyStaticPreset(config, nextPresetName) {
 	const staticConfig = config?.audio?.static;
@@ -214,12 +29,6 @@ function applyStaticPreset(config, nextPresetName) {
 
 applyStaticPreset(APP_CONFIG);
 
-const RADIO_QUERY = APP_CONFIG.radio.query;
-const RADIO_REQUEST = APP_CONFIG.radio.request;
-const SCAN_BIAS = APP_CONFIG.radio.tuning.scanBias;
-const AUDIO_ENGINE = APP_CONFIG.audio.engine;
-const STATIC_CFG = APP_CONFIG.audio.static;
-
 let audioContext = null;
 let noiseWorkletReady = false;
 let noiseWorkletLoadingPromise = null;
@@ -236,7 +45,7 @@ function createScriptNoiseNode(context, profile) {
 	let hiss = profile.hiss;
 	let crackleChance = profile.crackleChance;
 	let last = 0;
-	const node = context.createScriptProcessor(AUDIO_ENGINE.bufferSize, 1, 1);
+	const node = context.createScriptProcessor(APP_CONFIG.audio.engine.bufferSize, 1, 1);
 	node.setProfile = function(nextProfile) {
 		if (!nextProfile) return;
 		if (Number.isFinite(nextProfile.lowpass)) lowpass = nextProfile.lowpass;
@@ -245,7 +54,7 @@ function createScriptNoiseNode(context, profile) {
 	};
 	node.onaudioprocess = function(e) {
 		const output = e.outputBuffer.getChannelData(0);
-		for (let i = 0; i < AUDIO_ENGINE.bufferSize; i++) {
+		for (let i = 0; i < APP_CONFIG.audio.engine.bufferSize; i++) {
 			const white = Math.random() * 2 - 1;
 			last = last * lowpass + white * (1 - lowpass);
 			let sample = last * (1 - hiss) + white * hiss;
@@ -263,7 +72,7 @@ async function ensureNoiseWorkletLoaded(context) {
 	if (noiseWorkletReady) return true;
 	if (!noiseWorkletLoadingPromise) {
 		noiseWorkletLoadingPromise = context.audioWorklet
-			.addModule(AUDIO_ENGINE.workletModule)
+			.addModule(APP_CONFIG.audio.engine.workletModule)
 			.then(() => {
 				noiseWorkletReady = true;
 				return true;
@@ -285,14 +94,19 @@ function clampValue(value, min, max) {
 	return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
+function clampControl(control) {
+	if (!control || typeof control !== 'object') return 0;
+	return clampValue(control.value ?? control.default, control.min, control.max);
+}
+
 function deepClone(value) {
 	if (typeof structuredClone === 'function') return structuredClone(value);
 	return JSON.parse(JSON.stringify(value));
 }
 
 function getStaticLevelBounds() {
-	const base = clampValue(STATIC_CFG.volume.relative, 0, 1);
-	const variance = Math.max(0, Number(STATIC_CFG.volume.variance) || 0);
+	const base = clampValue(APP_CONFIG.audio.static.volume.relative, 0, 1);
+	const variance = Math.max(0, Number(APP_CONFIG.audio.static.volume.variance) || 0);
 	return {
 		min: clampValue(base - variance, 0, 1),
 		max: clampValue(base + variance, 0, 1),
@@ -305,7 +119,7 @@ function randomBetween(min, max) {
 }
 
 function getStaticToneVariance() {
-	return clampValue(STATIC_CFG.tone.variance, 0, 1);
+	return clampValue(APP_CONFIG.audio.static.tone.variance, 0, 1);
 }
 
 function varyTone(center, halfSpread, variance, min, max) {
@@ -314,7 +128,7 @@ function varyTone(center, halfSpread, variance, min, max) {
 }
 
 function getStaticDriftConfig() {
-	const cfg = STATIC_CFG.drift;
+	const cfg = APP_CONFIG.audio.static.drift;
 	const stepMin = clampValue(cfg.stepMin, 0, 1);
 	const stepMax = Math.max(stepMin, clampValue(cfg.stepMax, 0, 1));
 	return {
@@ -326,46 +140,36 @@ function getStaticDriftConfig() {
 }
 
 function getChunkIntervalBounds() {
-	const min = Math.max(0, Number(STATIC_CFG.chunking.interval.minMs) || 0);
-	const max = Math.max(min, Number(STATIC_CFG.chunking.interval.maxMs) || min);
+	const min = Math.max(0, Number(APP_CONFIG.audio.static.chunking.interval.minMs) || 0);
+	const max = Math.max(min, Number(APP_CONFIG.audio.static.chunking.interval.maxMs) || min);
 	return {min, max};
 }
 
-const CHUNK_MODE_VALUES_MS = [0, 750, 1500];
-const STATIC_PRESET_ORDER = ['conservative', 'classic', 'aggressive'];
-const STATIC_PRESET_LABELS = {
-	conservative: 'Soft',
-	classic: 'Medium',
-	aggressive: 'Hard',
-};
-
-function clampModeIndex(value, maxIndex) {
-	return Math.max(0, Math.min(maxIndex, Number(value) || 0));
+function normalizeOptionValue(value, options, fallback) {
+	if (options.includes(value)) return value;
+	if (options.includes(fallback)) return fallback;
+	return options[0];
 }
 
-function chunkModeToMs(mode) {
-	return CHUNK_MODE_VALUES_MS[clampModeIndex(mode, CHUNK_MODE_VALUES_MS.length - 1)];
+function toTitleCase(value) {
+	if (typeof value !== 'string' || !value.length) return '';
+	return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function chunkMsToMode(ms, enabled = true) {
-	if (!enabled || !Number.isFinite(ms) || ms <= 0) return 0;
-	if (ms >= 1125) return 2;
-	return 1;
+function isSweepMotion(value) {
+	return value === 'sweep';
 }
 
-function getInitialChunkMode() {
-	const bounds = getChunkIntervalBounds();
-	const avg = (bounds.min + bounds.max) / 2;
-	return chunkMsToMode(avg, Boolean(STATIC_CFG.chunking.enabledByDefault));
+function shouldJumpChunkNeedle(mode) {
+	return mode !== 'slide';
 }
 
-function presetModeToName(mode) {
-	return STATIC_PRESET_ORDER[clampModeIndex(mode, STATIC_PRESET_ORDER.length - 1)] || STATIC_PRESET_ORDER[1];
+function shouldJumpSweepNeedle(mode) {
+	return mode === 'jump';
 }
 
-function presetNameToMode(name) {
-	const index = STATIC_PRESET_ORDER.indexOf(name);
-	return index === -1 ? 1 : index;
+function clampChunkingMs(value) {
+	return clampValue(value, APP_CONFIG.controls.chunking.min, APP_CONFIG.controls.chunking.max);
 }
 
 function shuffled(array) {
@@ -377,18 +181,84 @@ function shuffled(array) {
 	return out;
 }
 
+function buildStationBandPositions(count, minSeparation = APP_CONFIG.radio.tuning.frequencyBand.minStationSeparation) {
+	if (count <= 0) return [];
+	if (count === 1) return [0];
+	const maxPossibleSep = 1 / (count - 1);
+	const safeMinSep = clampValue(minSeparation, 0, maxPossibleSep);
+	const slack = Math.max(0, 1 - safeMinSep * (count - 1));
+	const anchors = Array.from({length: count}, () => Math.random() * slack).sort((a, b) => a - b);
+	return anchors.map((anchor, i) => anchor + i * safeMinSep);
+}
+
+function buildSweepBandSlots(stationCount, stationBandPositions) {
+	if (stationCount <= 0) return [];
+	if (stationCount === 1) return [0];
+	const baseResolution = Math.max(24, Number(APP_CONFIG.radio.tuning.frequencyBand.resolution) || 180);
+	const resolution = Math.max(baseResolution, stationCount * 10);
+	const minSepBins = Math.max(1, Math.round(clampValue(APP_CONFIG.radio.tuning.frequencyBand.minStationSeparation, 0, 1) * resolution));
+	const repeatsMin = Math.max(1, Number(APP_CONFIG.radio.tuning.frequencyBand.repeatsMin) || 2);
+	const repeatsMax = Math.max(repeatsMin, Number(APP_CONFIG.radio.tuning.frequencyBand.repeatsMax) || 4);
+	const slots = Array.from({length: resolution}, () => -1);
+	const occurrences = [];
+
+	for (let station = 0; station < stationCount; station++) {
+		const repeats = Math.max(repeatsMin, Math.floor(randomBetween(repeatsMin, repeatsMax + 1)));
+		for (let i = 0; i < repeats; i++) occurrences.push(station);
+	}
+
+	const preferredAnchors = stationBandPositions?.map((pos) => Math.round(clampValue(pos, 0, 1) * (resolution - 1))) || [];
+
+	for (const station of shuffled(occurrences)) {
+		let placed = false;
+		for (let attempt = 0; attempt < 48; attempt++) {
+			const jitter = Math.floor(randomBetween(-minSepBins, minSepBins + 1));
+			const anchor = preferredAnchors[station] ?? Math.floor(Math.random() * resolution);
+			const candidate = ((anchor + jitter) % resolution + resolution) % resolution;
+			if (slots[candidate] !== -1) continue;
+			let conflict = false;
+			for (let d = -minSepBins; d <= minSepBins; d++) {
+				const idx = ((candidate + d) % resolution + resolution) % resolution;
+				if (slots[idx] === station) {
+					conflict = true;
+					break;
+				}
+			}
+			if (conflict) continue;
+			slots[candidate] = station;
+			placed = true;
+			break;
+		}
+		if (placed) continue;
+		const fallback = Math.floor(Math.random() * resolution);
+		if (slots[fallback] === -1) {
+			slots[fallback] = station;
+			continue;
+		}
+		const empty = slots.findIndex((slot) => slot === -1);
+		if (empty !== -1) slots[empty] = station;
+	}
+
+	for (let i = 0; i < slots.length; i++) {
+		if (slots[i] !== -1) continue;
+		slots[i] = Math.floor(Math.random() * stationCount);
+	}
+
+	return slots;
+}
+
 function getStationPageCount(limit) {
 	const safeLimit = Math.max(1, Number(limit) || 1);
-	const poolSize = Math.max(safeLimit, Number(RADIO_QUERY.totalTopStations) || safeLimit);
+	const poolSize = Math.max(safeLimit, Number(APP_CONFIG.radio.query.totalTopStations) || safeLimit);
 	return Math.max(1, Math.floor(poolSize / safeLimit));
 }
 
 function getSampleOffsets(limit) {
 	const safeLimit = Math.max(1, Number(limit) || 1);
-	const baseOffset = Math.max(0, Number(RADIO_QUERY.offset) || 0);
-	if (!RADIO_QUERY.randomizeOffset) return [baseOffset];
+	const baseOffset = Math.max(0, Number(APP_CONFIG.radio.query.offset) || 0);
+	if (!APP_CONFIG.radio.query.randomizeOffset) return [baseOffset];
 	const pageCount = getStationPageCount(safeLimit);
-	const sampleCount = Math.max(1, Math.min(pageCount, Number(RADIO_QUERY.pageSamplesPerLoad) || 1));
+	const sampleCount = Math.max(1, Math.min(pageCount, Number(APP_CONFIG.radio.query.pageSamplesPerLoad) || 1));
 	const pages = shuffled(Array.from({length: pageCount}, (_, i) => i)).slice(0, sampleCount);
 	return pages.map((page) => baseOffset + page * safeLimit);
 }
@@ -406,9 +276,9 @@ async function getStationsFromRadioBrowser(limit) {
 				bases: APP_CONFIG.radio.bases,
 				limit: safeLimit,
 				offset,
-				timeoutMs: RADIO_REQUEST.timeoutMs,
-				retries: RADIO_REQUEST.retries,
-				retryDelayMs: RADIO_REQUEST.retryDelayMs,
+				timeoutMs: APP_CONFIG.radio.request.timeoutMs,
+				retries: APP_CONFIG.radio.request.retries,
+				retryDelayMs: APP_CONFIG.radio.request.retryDelayMs,
 			});
 			for (const station of result.stations) {
 				if (seenUrls.has(station.url)) continue;
@@ -427,22 +297,37 @@ async function getStationsFromRadioBrowser(limit) {
 	}
 
 	const selected = shuffled(mergedStations).slice(0, safeLimit);
-	return {stations: selected, source: `radio-browser:${RADIO_BROWSER_API_BASE}`};
+	return {stations: selected, source: `radio-browser:${APP_CONFIG.radio.bases[0]}`};
 }
 
 function buildUiState() {
-	const transitions = APP_CONFIG.ui.transitions;
+	const configuredUi = APP_CONFIG.ui || {};
+	const configuredNeedle = configuredUi.needle || {};
+	const configuredNeedleMode = configuredNeedle.mode || {};
+	const transitions = configuredNeedle.transitions || {};
 	return {
-		needleMotion: normalizeNeedleMotion(APP_CONFIG.ui.needleMotion),
-		tuneDisplayPercent: 0,
-		needleFrame: null,
-		stationToStationMs: transitions.stationToStationMs,
-		stationToStaticMs: transitions.stationToStaticMs,
-		staticToStationMs: transitions.staticToStationMs,
-		volumeRampMs: transitions.volumeRampMs,
-		keepStaticEngineWarm: transitions.keepStaticEngineWarm,
-		fadeToken: 0,
-		times: [50, 100, 250, 500, 750, 1000],
+		ui: {
+			needle: {
+				motion: normalizeNeedleMotion(configuredNeedle.motion),
+				mode: {
+					sweep: configuredNeedleMode.sweep === 'jump' ? 'jump' : 'smooth',
+					chunk: configuredNeedleMode.chunk === 'slide' ? 'slide' : 'jump',
+				},
+				transitions: {
+					stationToStationMs: transitions.stationToStationMs,
+					stationToStaticMs: transitions.stationToStaticMs,
+					staticToStationMs: transitions.staticToStationMs,
+					volumeRampMs: transitions.volumeRampMs,
+					keepStaticEngineWarm: transitions.keepStaticEngineWarm,
+				},
+			},
+			runtime: {
+				tuneDisplayPercent: 0,
+				needleFrame: null,
+				fadeToken: 0,
+				times: [50, 100, 250, 500, 750, 1000],
+			},
+		},
 	};
 }
 
@@ -450,22 +335,22 @@ function buildControlState() {
 	const controls = deepClone(APP_CONFIG.controls);
 	controls.stations.max = Math.max(1, controls.stations.max);
 	controls.stations.value = Math.max(controls.stations.min, Math.min(controls.stations.default, controls.stations.max));
-	controls.volume.value = clampValue(controls.volume.default, controls.volume.min, controls.volume.max);
-	controls.hopIntervalMs.value = clampValue(controls.hopIntervalMs.default, controls.hopIntervalMs.min, controls.hopIntervalMs.max);
-	controls.stationDensity.value = clampValue(controls.stationDensity.default, controls.stationDensity.min, controls.stationDensity.max);
-	controls.jitterMs.value = clampValue(controls.jitterMs.default, controls.jitterMs.min, controls.jitterMs.max);
-	controls.chunkMode.min = 0;
-	controls.chunkMode.max = CHUNK_MODE_VALUES_MS.length - 1;
-	controls.chunkMode.step = 1;
-	controls.chunkMode.value = getInitialChunkMode();
-	controls.staticPreset.min = 0;
-	controls.staticPreset.max = STATIC_PRESET_ORDER.length - 1;
-	controls.staticPreset.step = 1;
-	controls.staticPreset.value = presetNameToMode(STATIC_CFG.preset);
-	controls.sliderMotion.min = 0;
-	controls.sliderMotion.max = 1;
-	controls.sliderMotion.step = 1;
-	controls.sliderMotion.value = clampModeIndex(controls.sliderMotion.default, controls.sliderMotion.max);
+	controls.volume.value = clampControl(controls.volume);
+	controls.hopIntervalMs.value = clampControl(controls.hopIntervalMs);
+	controls.stationDensity.value = clampControl(controls.stationDensity);
+	controls.jitterMs.value = clampControl(controls.jitterMs);
+	controls.chunking.max = Math.max(controls.chunking.min, controls.chunking.max);
+	controls.chunking.value = clampChunkingMs(controls.chunking.default);
+	controls.static.value = normalizeOptionValue(
+		APP_CONFIG.audio.static.preset,
+		controls.static.options,
+		controls.static.default
+	);
+	controls.motion.value = normalizeOptionValue(
+		controls.motion.default,
+		controls.motion.options,
+		'sweep'
+	);
 	return {
 		controls,
 	};
@@ -473,37 +358,63 @@ function buildControlState() {
 
 function buildStaticState() {
 	return {
-		isStatic: false,
-		staticPosition: 0,
-		staticNode: null,
-		staticFilter: null,
-		staticGain: null,
-		staticInitPromise: null,
-		staticHumOscA: null,
-		staticHumOscB: null,
-		staticHumGain: null,
-		staticHumPhase: 0,
-		staticLevelFactor: clampValue(STATIC_CFG.volume.relative, 0, 1),
-		staticToneDrift: 0,
-		staticToneVelocity: 0,
-		chunkingEnabled: Boolean(STATIC_CFG.chunking.enabledByDefault),
-		chunkIntervalMinMs: getChunkIntervalBounds().min,
-		chunkIntervalMaxMs: getChunkIntervalBounds().max,
-		chunkTimer: null,
-		microMuteTimer: null,
-		scanDirection: Math.random() < 0.5 ? -1 : 1,
-		scanRunRemaining: 0,
-		streamPrewarmCount: AUDIO_ENGINE.streamPrewarmCount,
+		static: {
+			active: false,
+			position: 0,
+			node: null,
+			filter: null,
+			gain: null,
+			initPromise: null,
+			hum: {
+				osc: {
+					A: null,
+					B: null,
+				},
+				gain: null,
+				phase: 0,
+			},
+			levelFactor: clampValue(APP_CONFIG.audio.static.volume.relative, 0, 1),
+			tone: {
+				drift: 0,
+				velocity: 0,
+			},
+			chunking: {
+				enabled: Boolean(APP_CONFIG.audio.static.chunking.enabledByDefault),
+				interval: {
+					minMs: getChunkIntervalBounds().min,
+					maxMs: getChunkIntervalBounds().max,
+				},
+				timer: null,
+			},
+			microMute: {
+				timer: null,
+			},
+			scan: {
+				direction: Math.random() < 0.5 ? -1 : 1,
+				runRemaining: 0,
+			},
+			stream: {
+				prewarmCount: APP_CONFIG.audio.engine.streamPrewarmCount,
+			},
+		},
 	};
 }
 
 function buildRuntimeState() {
 	return {
-		index: 0,
-		sweepCursor: 0,
-		allStations: null,
-		retuneTimer: null,
-		play: false,
+		runtime: {
+			index: 0,
+			allStations: null,
+			retuneTimer: null,
+			play: false,
+		},
+		sweep: {
+			cursor: 0,
+			bandIndex: 0,
+			currentBandIndex: 0,
+			stationBandPositions: [],
+			bandSlots: [],
+		},
 	};
 }
 
@@ -518,42 +429,57 @@ const SPIRIT_APP_COMPUTED = {
 		return Array.from({length: 64}, () => '....|').join('') + '....';
 	},
 	get stations() {
-		return this.allStations?.slice(0, this.controls.stations.value) ?? [];
+		return this.runtime.allStations?.slice(0, this.controls.stations.value) ?? [];
 	},
-	get chunkModeMs() {
-		return chunkModeToMs(this.controls.chunkMode.value);
+	get allStations() {
+		return this.runtime.allStations;
 	},
-	get chunkModeLabel() {
-		return this.chunkModeMs === 0 ? 'Off' : `${this.chunkModeMs}ms`;
+	get play() {
+		return this.runtime.play;
 	},
-	get staticPresetName() {
-		return presetModeToName(this.controls.staticPreset.value);
+	get chunkingMs() {
+		return clampChunkingMs(this.controls.chunking.value);
 	},
-	get staticPresetLabel() {
-		return STATIC_PRESET_LABELS[this.staticPresetName] || 'Medium';
+	get chunkingLabel() {
+		return this.chunkingMs === 0 ? 'Off' : `${this.chunkingMs}ms`;
 	},
-	get sliderMotionLabel() {
-		return this.controls.sliderMotion.value === 1 ? 'Sweep' : 'Random';
+	get staticName() {
+		return this.controls.static.value;
+	},
+	get staticLabel() {
+		return toTitleCase(this.staticName) || 'Medium';
+	},
+	get motionLabel() {
+		return toTitleCase(this.controls.motion.value) || 'Sweep';
 	},
 	get station() {
-		if (!this.play || this.isStatic) return null;
-		return this.stations?.[this.index];
+		if (!this.runtime.play || this.static.active) return null;
+		return this.stations?.[this.runtime.index];
 	},
 	get currentStationNumber() {
-		if (this.isStatic) return 0;
-		return Math.min(this.controls.stations.value, Math.max(1, this.index + 1));
+		if (this.static.active) return 0;
+		return Math.min(this.controls.stations.value, Math.max(1, this.runtime.index + 1));
 	},
 	get tunePercent() {
 		if (this.controls.stations.value <= 1) return 0;
-		const source = this.isStatic ? this.staticPosition : this.index;
+		if (isSweepMotion(this.controls.motion.value)) {
+			if (this.static.active) return clampValue(this.static.position, 0, 1) * 100;
+			const slotsCount = this.sweep.bandSlots?.length || 0;
+			if (slotsCount > 1) return (this.sweep.currentBandIndex / (slotsCount - 1)) * 100;
+			return 0;
+		}
+		const source = this.static.active ? this.static.position : this.runtime.index;
 		const clamped = Math.min(this.controls.stations.value - 1, Math.max(0, source));
 		return (clamped / (this.controls.stations.value - 1)) * 100;
 	},
 	get needleMotionClass() {
-		return `motion-${this.needleMotion}`;
+		return `motion-${this.ui.needle.motion}`;
 	},
 	get needleStyle() {
-		return {left: `${this.tuneDisplayPercent}%`};
+		return {left: `${this.ui.runtime.tuneDisplayPercent}%`};
+	},
+	get times() {
+		return this.ui.runtime.times;
 	},
 };
 
@@ -564,18 +490,47 @@ const SPIRIT_APP_METHODS = {
 		if (playPromise?.catch) playPromise.catch(() => {});
 	},
 	clearRetuneTimer() {
-		clearTimeout(this.retuneTimer);
-		this.retuneTimer = null;
+		clearTimeout(this.runtime.retuneTimer);
+		this.runtime.retuneTimer = null;
 	},
 	applyStations(stations) {
-		this.allStations = stations;
-		if (this.controls.stations.value > this.allStations.length) {
-			this.controls.stations.value = this.allStations.length;
+		this.runtime.allStations = stations;
+		if (this.controls.stations.value > this.runtime.allStations.length) {
+			this.controls.stations.value = this.runtime.allStations.length;
 		}
-		if (this.sweepCursor >= this.controls.stations.value) {
-			this.sweepCursor = 0;
+		this.rebuildStationBand();
+		if (this.sweep.cursor >= this.controls.stations.value) {
+			this.sweep.cursor = 0;
 		}
 		this.syncNeedle();
+	},
+	rebuildStationBand() {
+		this.sweep.stationBandPositions = buildStationBandPositions(this.stations.length);
+		this.sweep.bandSlots = buildSweepBandSlots(this.stations.length, this.sweep.stationBandPositions);
+	},
+	getSweepStep() {
+		const slotsCount = Math.max(2, this.sweep.bandSlots?.length || 0);
+		return 1 / (slotsCount - 1);
+	},
+	getSweepStationIndex(bandIndex = this.sweep.bandIndex) {
+		if (!this.sweep.bandSlots?.length) return 0;
+		const idx = ((Math.floor(bandIndex) % this.sweep.bandSlots.length) + this.sweep.bandSlots.length) % this.sweep.bandSlots.length;
+		return this.sweep.bandSlots[idx];
+	},
+	advanceSweepBand() {
+		if (!this.sweep.bandSlots?.length) return;
+		this.sweep.bandIndex = (this.sweep.bandIndex + 1) % this.sweep.bandSlots.length;
+	},
+	reseedSweepBand() {
+		if (!this.sweep.bandSlots?.length) return;
+		this.sweep.bandIndex = Math.floor(Math.random() * this.sweep.bandSlots.length);
+	},
+	chooseSweepIndex() {
+		if (!this.stations.length) return 0;
+		this.sweep.currentBandIndex = this.sweep.bandIndex;
+		const next = this.getSweepStationIndex(this.sweep.bandIndex);
+		this.advanceSweepBand();
+		return next;
 	},
 	async loadStations() {
 		const preferFile = new URLSearchParams(window.location.search).get('source') === 'file';
@@ -589,7 +544,7 @@ const SPIRIT_APP_METHODS = {
 			}
 		}
 		try {
-			const response = await fetch('./stations.json?v=20261028');
+			const response = await fetch('./stations.json');
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
@@ -597,26 +552,99 @@ const SPIRIT_APP_METHODS = {
 			this.applyStations(json);
 		} catch (error) {
 			console.error('Failed to load stations from remote API and stations.json', error);
-			this.allStations = [];
+			this.runtime.allStations = [];
 		}
 	},
 	syncNeedle() {
 		const target = this.tunePercent;
-		if (this.needleMotion === 'step' || this.needleMotion === 'smooth') {
-			if (this.needleFrame) cancelAnimationFrame(this.needleFrame);
-			this.needleFrame = null;
-			this.tuneDisplayPercent = target;
+		const chunkNeedleMode = this.ui.needle.mode.chunk;
+		if (this.static.active && shouldJumpChunkNeedle(chunkNeedleMode)) {
+			if (this.ui.runtime.needleFrame) cancelAnimationFrame(this.ui.runtime.needleFrame);
+			this.ui.runtime.needleFrame = null;
+			this.ui.runtime.tuneDisplayPercent = target;
+			return;
+		}
+		const isSweepNeedle = isSweepMotion(this.controls.motion.value);
+		if (isSweepNeedle && shouldJumpSweepNeedle(this.ui.needle.mode.sweep)) {
+			if (this.ui.runtime.needleFrame) cancelAnimationFrame(this.ui.runtime.needleFrame);
+			this.ui.runtime.needleFrame = null;
+			this.ui.runtime.tuneDisplayPercent = target;
+			return;
+		}
+		if (isSweepNeedle && target < this.ui.runtime.tuneDisplayPercent) {
+			if (this.ui.needle.mode.sweep !== 'smooth') {
+				if (this.ui.runtime.needleFrame) cancelAnimationFrame(this.ui.runtime.needleFrame);
+				this.ui.runtime.needleFrame = null;
+				this.ui.runtime.tuneDisplayPercent = target;
+				return;
+			}
+			this.animateSweepWrap(target);
+			return;
+		}
+		if (this.ui.needle.motion === 'step' || this.ui.needle.motion === 'smooth') {
+			if (this.ui.runtime.needleFrame) cancelAnimationFrame(this.ui.runtime.needleFrame);
+			this.ui.runtime.needleFrame = null;
+			this.ui.runtime.tuneDisplayPercent = target;
 			return;
 		}
 		this.animateNeedle(target);
 	},
+	animateSweepWrap(target) {
+		if (this.ui.runtime.needleFrame) cancelAnimationFrame(this.ui.runtime.needleFrame);
+		const start = this.ui.runtime.tuneDisplayPercent;
+		const endCap = 100;
+		const firstDelta = Math.max(0, endCap - start);
+		const toEndDuration = 100 + Math.min(180, firstDelta * 4);
+		const fromStartDuration = 90 + Math.min(220, Math.max(0, target) * 6);
+
+		const startPhaseTwo = () => {
+			this.ui.runtime.tuneDisplayPercent = 0;
+			if (target <= 0.1) {
+				this.ui.runtime.tuneDisplayPercent = target;
+				this.ui.runtime.needleFrame = null;
+				return;
+			}
+			const phaseTwoStart = performance.now();
+			const stepTwo = (now) => {
+				const t = Math.min(1, (now - phaseTwoStart) / fromStartDuration);
+				const eased = 1 - Math.pow(1 - t, 3);
+				this.ui.runtime.tuneDisplayPercent = target * eased;
+				if (t < 1) {
+					this.ui.runtime.needleFrame = requestAnimationFrame(stepTwo);
+					return;
+				}
+				this.ui.runtime.tuneDisplayPercent = target;
+				this.ui.runtime.needleFrame = null;
+			};
+			this.ui.runtime.needleFrame = requestAnimationFrame(stepTwo);
+		};
+
+		if (firstDelta <= 0.1) {
+			startPhaseTwo();
+			return;
+		}
+
+		const phaseOneStart = performance.now();
+		const stepOne = (now) => {
+			const t = Math.min(1, (now - phaseOneStart) / toEndDuration);
+			const eased = 1 - Math.pow(1 - t, 3);
+			this.ui.runtime.tuneDisplayPercent = start + firstDelta * eased;
+			if (t < 1) {
+				this.ui.runtime.needleFrame = requestAnimationFrame(stepOne);
+				return;
+			}
+			startPhaseTwo();
+		};
+		this.ui.runtime.needleFrame = requestAnimationFrame(stepOne);
+	},
 	animateNeedle(target) {
-		if (this.needleFrame) cancelAnimationFrame(this.needleFrame);
-		const start = this.tuneDisplayPercent;
+		if (this.ui.runtime.needleFrame) cancelAnimationFrame(this.ui.runtime.needleFrame);
+		const start = this.ui.runtime.tuneDisplayPercent;
 		const delta = target - start;
+		const isSweepNeedle = isSweepMotion(this.controls.motion.value);
 		if (Math.abs(delta) < 0.1) {
-			this.tuneDisplayPercent = target;
-			this.needleFrame = null;
+			this.ui.runtime.tuneDisplayPercent = target;
+			this.ui.runtime.needleFrame = null;
 			return;
 		}
 		const startTime = performance.now();
@@ -624,16 +652,21 @@ const SPIRIT_APP_METHODS = {
 		const step = (now) => {
 			const t = Math.min(1, (now - startTime) / duration);
 			const eased = 1 - Math.pow(1 - t, 3);
-			const wobble = Math.sin(t * Math.PI * 4) * (1 - t) * 0.6;
-			this.tuneDisplayPercent = start + delta * eased + wobble;
+			const wobble = isSweepNeedle ? 0 : Math.sin(t * Math.PI * 4) * (1 - t) * 0.6;
+			const nextValue = start + delta * eased + wobble;
+			if (isSweepNeedle && delta > 0) {
+				this.ui.runtime.tuneDisplayPercent = Math.max(this.ui.runtime.tuneDisplayPercent, Math.min(target, nextValue));
+			} else {
+				this.ui.runtime.tuneDisplayPercent = nextValue;
+			}
 			if (t < 1) {
-				this.needleFrame = requestAnimationFrame(step);
+				this.ui.runtime.needleFrame = requestAnimationFrame(step);
 				return;
 			}
-			this.tuneDisplayPercent = target;
-			this.needleFrame = null;
+			this.ui.runtime.tuneDisplayPercent = target;
+			this.ui.runtime.needleFrame = null;
 		};
-		this.needleFrame = requestAnimationFrame(step);
+		this.ui.runtime.needleFrame = requestAnimationFrame(step);
 	},
 	onPlayClick() {
 		this.playPause();
@@ -663,16 +696,16 @@ const SPIRIT_APP_METHODS = {
 		return createScriptNoiseNode(context, profile);
 	},
 	applyNoiseProfile(profile) {
-		if (!this.staticNode || !profile) return;
-		if (typeof this.staticNode.setProfile === 'function') {
-			this.staticNode.setProfile(profile);
+		if (!this.static.node || !profile) return;
+		if (typeof this.static.node.setProfile === 'function') {
+			this.static.node.setProfile(profile);
 			return;
 		}
-		if (this.staticNode.port?.postMessage) {
-			this.staticNode.port.postMessage({type: 'set-profile', profile});
+		if (this.static.node.port?.postMessage) {
+			this.static.node.port.postMessage({type: 'set-profile', profile});
 		}
 	},
-	buildNoiseProfile(drift = this.staticToneDrift) {
+	buildNoiseProfile(drift = this.static.tone.drift) {
 		const toneVariance = getStaticToneVariance();
 		const driftScaled = clampValue(drift, -1, 1) * toneVariance;
 		return {
@@ -682,195 +715,206 @@ const SPIRIT_APP_METHODS = {
 		};
 	},
 	stationBedStaticTarget() {
-		const relative = clampValue(STATIC_CFG.volume.stationBedRelative, 0, 1);
+		const relative = clampValue(APP_CONFIG.audio.static.volume.stationBedRelative, 0, 1);
 		return this.clampVolume((this.controls.volume.value / 100) * relative);
 	},
 	setStaticHumTarget() {
-		if (!STATIC_CFG.hum.enabled || !this.staticHumGain) return;
-		const target = this.clampVolume((this.isStatic ? this.staticTargetGain() : this.stationBedStaticTarget()) * STATIC_CFG.hum.relativeLevel);
-		this.staticHumGain.gain.setTargetAtTime(target, getAudioContext().currentTime, 0.08);
+		if (!APP_CONFIG.audio.static.hum.enabled || !this.static.hum.gain) return;
+		const target = this.clampVolume((this.static.active ? this.staticTargetGain() : this.stationBedStaticTarget()) * APP_CONFIG.audio.static.hum.relativeLevel);
+		this.static.hum.gain.gain.setTargetAtTime(target, getAudioContext().currentTime, 0.08);
 	},
 	retuneHum() {
-		if (!STATIC_CFG.hum.enabled || !this.staticHumOscA || !this.staticHumOscB) return;
+		if (!APP_CONFIG.audio.static.hum.enabled || !this.static.hum.osc.A || !this.static.hum.osc.B) return;
 		const context = getAudioContext();
 		const now = context.currentTime;
-		this.staticHumPhase += randomBetween(0.6, 1.4) * STATIC_CFG.hum.wanderHz;
-		const wobble = Math.sin(this.staticHumPhase) * STATIC_CFG.hum.wanderDepthHz;
-		this.staticHumOscA.frequency.setTargetAtTime(STATIC_CFG.hum.baseHz + wobble, now, 0.2);
-		this.staticHumOscB.frequency.setTargetAtTime(STATIC_CFG.hum.overtoneHz + wobble * 0.85, now, 0.24);
+		this.static.hum.phase += randomBetween(0.6, 1.4) * APP_CONFIG.audio.static.hum.wanderHz;
+		const wobble = Math.sin(this.static.hum.phase) * APP_CONFIG.audio.static.hum.wanderDepthHz;
+		this.static.hum.osc.A.frequency.setTargetAtTime(APP_CONFIG.audio.static.hum.baseHz + wobble, now, 0.2);
+		this.static.hum.osc.B.frequency.setTargetAtTime(APP_CONFIG.audio.static.hum.overtoneHz + wobble * 0.85, now, 0.24);
 	},
 	startHumBed() {
-		if (!STATIC_CFG.hum.enabled || this.staticHumOscA || this.staticHumOscB) return;
+		if (!APP_CONFIG.audio.static.hum.enabled || this.static.hum.osc.A || this.static.hum.osc.B) return;
 		const context = getAudioContext();
 		const humGain = context.createGain();
 		humGain.gain.value = 0;
-		const oscA = context.createOscillator();
-		oscA.type = 'sine';
-		oscA.frequency.value = STATIC_CFG.hum.baseHz;
-		const oscB = context.createOscillator();
-		oscB.type = 'triangle';
-		oscB.frequency.value = STATIC_CFG.hum.overtoneHz;
-		oscA.connect(humGain);
-		oscB.connect(humGain);
-		humGain.connect(this.staticGain);
-		oscA.start();
-		oscB.start();
-		this.staticHumGain = humGain;
-		this.staticHumOscA = oscA;
-		this.staticHumOscB = oscB;
+		const osc = {
+			A: context.createOscillator(),
+			B: context.createOscillator(),
+		};
+		osc.A.type = 'sine';
+		osc.A.frequency.value = APP_CONFIG.audio.static.hum.baseHz;
+		osc.B.type = 'triangle';
+		osc.B.frequency.value = APP_CONFIG.audio.static.hum.overtoneHz;
+		osc.A.connect(humGain);
+		osc.B.connect(humGain);
+		humGain.connect(this.static.gain);
+		osc.A.start();
+		osc.B.start();
+		this.static.hum.gain = humGain;
+		this.static.hum.osc.A = osc.A;
+		this.static.hum.osc.B = osc.B;
 		this.setStaticHumTarget();
 	},
 	stopHumBed() {
-		if (this.staticHumOscA) {
-			try { this.staticHumOscA.stop(); } catch {}
-			try { this.staticHumOscA.disconnect(); } catch {}
+		if (this.static.hum.osc.A) {
+			try { this.static.hum.osc.A.stop(); } catch {}
+			try { this.static.hum.osc.A.disconnect(); } catch {}
 		}
-		if (this.staticHumOscB) {
-			try { this.staticHumOscB.stop(); } catch {}
-			try { this.staticHumOscB.disconnect(); } catch {}
+		if (this.static.hum.osc.B) {
+			try { this.static.hum.osc.B.stop(); } catch {}
+			try { this.static.hum.osc.B.disconnect(); } catch {}
 		}
-		if (this.staticHumGain) {
-			try { this.staticHumGain.disconnect(); } catch {}
+		if (this.static.hum.gain) {
+			try { this.static.hum.gain.disconnect(); } catch {}
 		}
-		this.staticHumOscA = null;
-		this.staticHumOscB = null;
-		this.staticHumGain = null;
+		this.static.hum.osc.A = null;
+		this.static.hum.osc.B = null;
+		this.static.hum.gain = null;
 	},
 	resetScanRun() {
-		if (!SCAN_BIAS.enabled) return;
-		if (Math.random() < SCAN_BIAS.reverseChance) this.scanDirection *= -1;
-		this.scanRunRemaining = Math.floor(randomBetween(SCAN_BIAS.holdStepsMin, SCAN_BIAS.holdStepsMax + 1));
+		if (!APP_CONFIG.radio.tuning.scanBias.enabled) return;
+		if (Math.random() < APP_CONFIG.radio.tuning.scanBias.reverseChance) this.static.scan.direction *= -1;
+		this.static.scan.runRemaining = Math.floor(randomBetween(APP_CONFIG.radio.tuning.scanBias.holdStepsMin, APP_CONFIG.radio.tuning.scanBias.holdStepsMax + 1));
 	},
 	nextScanIndex(count) {
-		if (!SCAN_BIAS.enabled || count <= 1) return null;
-		if (this.scanRunRemaining <= 0) this.resetScanRun();
-		this.scanRunRemaining = Math.max(0, this.scanRunRemaining - 1);
-		if (Math.random() > SCAN_BIAS.biasStrength) return null;
-		return (this.index + this.scanDirection + count) % count;
+		if (!APP_CONFIG.radio.tuning.scanBias.enabled || count <= 1) return null;
+		if (this.static.scan.runRemaining <= 0) this.resetScanRun();
+		this.static.scan.runRemaining = Math.max(0, this.static.scan.runRemaining - 1);
+		if (Math.random() > APP_CONFIG.radio.tuning.scanBias.biasStrength) return null;
+		return (this.runtime.index + this.static.scan.direction + count) % count;
 	},
 	advanceStaticDrift() {
 		const driftCfg = getStaticDriftConfig();
 		if (Math.random() < driftCfg.flipChance) {
-			this.staticToneVelocity *= -0.6;
+			this.static.tone.velocity *= -0.6;
 		}
-		this.staticToneVelocity += (Math.random() * 2 - 1) * driftCfg.accel;
+		this.static.tone.velocity += (Math.random() * 2 - 1) * driftCfg.accel;
 		const maxStep = randomBetween(driftCfg.stepMin, driftCfg.stepMax);
-		this.staticToneVelocity = clampValue(this.staticToneVelocity, -maxStep, maxStep);
-		this.staticToneDrift = clampValue(this.staticToneDrift + this.staticToneVelocity, -1, 1);
+		this.static.tone.velocity = clampValue(this.static.tone.velocity, -maxStep, maxStep);
+		this.static.tone.drift = clampValue(this.static.tone.drift + this.static.tone.velocity, -1, 1);
 	},
 	nextChunkDelay() {
-		this.chunkIntervalMinMs = Math.max(0, Number(this.chunkIntervalMinMs) || 0);
-		this.chunkIntervalMaxMs = Math.max(this.chunkIntervalMinMs, Number(this.chunkIntervalMaxMs) || this.chunkIntervalMinMs);
-		return Math.floor(randomBetween(this.chunkIntervalMinMs, this.chunkIntervalMaxMs));
+		this.static.chunking.interval.minMs = Math.max(0, Number(this.static.chunking.interval.minMs) || 0);
+		this.static.chunking.interval.maxMs = Math.max(this.static.chunking.interval.minMs, Number(this.static.chunking.interval.maxMs) || this.static.chunking.interval.minMs);
+		return Math.floor(randomBetween(this.static.chunking.interval.minMs, this.static.chunking.interval.maxMs));
 	},
 	clearChunkTimer() {
-		clearTimeout(this.chunkTimer);
-		this.chunkTimer = null;
+		clearTimeout(this.static.chunking.timer);
+		this.static.chunking.timer = null;
 	},
 	clearMicroMuteTimer() {
-		clearTimeout(this.microMuteTimer);
-		this.microMuteTimer = null;
+		clearTimeout(this.static.microMute.timer);
+		this.static.microMute.timer = null;
 	},
 	applyChunkJump() {
-		const jumpAmount = clampValue(STATIC_CFG.chunking.jumpAmount, 0, 1);
+		const jumpAmount = clampValue(APP_CONFIG.audio.static.chunking.jumpAmount, 0, 1);
 		const target = randomBetween(-1, 1);
-		this.staticToneDrift = clampValue(this.staticToneDrift + (target - this.staticToneDrift) * jumpAmount, -1, 1);
-		if (Math.random() < 0.5) this.staticToneVelocity *= -0.5;
+		this.static.tone.drift = clampValue(this.static.tone.drift + (target - this.static.tone.drift) * jumpAmount, -1, 1);
+		if (Math.random() < 0.5) this.static.tone.velocity *= -0.5;
 		this.retuneStaticTexture(false);
 	},
 	scheduleChunkTick() {
 		this.clearChunkTimer();
-		if (!this.play || !this.chunkingEnabled) return;
+		if (!this.runtime.play || !this.static.chunking.enabled) return;
 		const delay = this.nextChunkDelay();
-		this.chunkTimer = setTimeout(() => {
-			if (!this.play || !this.chunkingEnabled) {
+		this.static.chunking.timer = setTimeout(() => {
+			if (!this.runtime.play || !this.static.chunking.enabled) {
 				this.clearChunkTimer();
 				return;
 			}
+			if (isSweepMotion(this.controls.motion.value)) this.reseedSweepBand();
 			this.startStatic().then(() => {
 				this.applyChunkJump();
 			}).catch(() => {});
 			this.scheduleChunkTick();
 		}, delay);
 	},
-	updateChunking() {
-		if (!this.play || !this.chunkingEnabled) {
+	refreshChunkingTimer() {
+		if (!this.runtime.play || !this.static.chunking.enabled) {
 			this.clearChunkTimer();
 			return;
 		}
 		this.scheduleChunkTick();
 	},
-	updateChunkMode() {
-		this.controls.chunkMode.value = clampModeIndex(this.controls.chunkMode.value, this.controls.chunkMode.max);
-		const ms = this.chunkModeMs;
-		this.chunkingEnabled = ms > 0;
-		this.chunkIntervalMinMs = ms;
-		this.chunkIntervalMaxMs = ms;
-		this.updateChunking();
+	updateChunking() {
+		this.controls.chunking.value = clampChunkingMs(this.controls.chunking.value);
+		const ms = this.chunkingMs;
+		this.static.chunking.enabled = ms > 0;
+		this.static.chunking.interval.minMs = ms;
+		this.static.chunking.interval.maxMs = ms;
+		this.refreshChunkingTimer();
 	},
-	updateStaticPreset() {
-		this.controls.staticPreset.value = clampModeIndex(this.controls.staticPreset.value, this.controls.staticPreset.max);
-		const name = this.staticPresetName;
-		if (!applyStaticPreset(APP_CONFIG, name)) return;
-		if (this.controls.chunkMode.value !== 0) this.updateChunkMode();
-		if (this.staticNode && this.staticFilter && this.staticGain) {
+	updateStatic() {
+		this.controls.static.value = normalizeOptionValue(
+			this.controls.static.value,
+			this.controls.static.options,
+			this.controls.static.default
+		);
+		const presetName = this.controls.static.value;
+		if (!applyStaticPreset(APP_CONFIG, presetName)) return;
+		if (this.controls.chunking.value !== 0) this.updateChunking();
+		if (this.static.node && this.static.filter && this.static.gain) {
 			this.retuneStaticTexture(false);
 			this.setStaticHumTarget();
 		}
 		this.updateMicroMute();
-		this.updateChunking();
+		this.refreshChunkingTimer();
 	},
 	scheduleMicroMuteTick() {
 		this.clearMicroMuteTimer();
-		const cfg = STATIC_CFG.microMute;
-		if (!this.play || !cfg.enabled) return;
+		const cfg = APP_CONFIG.audio.static.microMute;
+		if (!this.runtime.play || !cfg.enabled) return;
 		const waitMs = Math.floor(randomBetween(cfg.intervalMinMs, cfg.intervalMaxMs));
-		this.microMuteTimer = setTimeout(() => {
-			if (!this.play || !cfg.enabled) {
+		this.static.microMute.timer = setTimeout(() => {
+			if (!this.runtime.play || !cfg.enabled) {
 				this.clearMicroMuteTimer();
 				return;
 			}
-			const token = this.fadeToken;
-			const baseTarget = this.isStatic ? this.staticTargetGain() : this.stationBedStaticTarget();
-			const duckFactor = randomBetween(cfg.duckMin, cfg.duckMax);
-			const duckTarget = this.clampVolume(baseTarget * duckFactor);
-			const dur = Math.floor(randomBetween(cfg.durationMinMs, cfg.durationMaxMs));
-			this.fadeStaticGain(duckTarget, Math.max(18, Math.floor(dur * 0.35)), token);
+			const token = this.ui.runtime.fadeToken;
+			const baseTarget = this.static.active ? this.staticTargetGain() : this.stationBedStaticTarget();
+			const duck = {
+				factor: randomBetween(cfg.duckMin, cfg.duckMax),
+				durationMs: Math.floor(randomBetween(cfg.durationMinMs, cfg.durationMaxMs)),
+			};
+			duck.target = this.clampVolume(baseTarget * duck.factor);
+			this.fadeStaticGain(duck.target, Math.max(18, Math.floor(duck.durationMs * 0.35)), token);
 			setTimeout(() => {
-				if (token !== this.fadeToken) return;
-				this.fadeStaticGain(baseTarget, Math.max(30, Math.floor(dur * 0.65)), token);
-			}, dur);
+				if (token !== this.ui.runtime.fadeToken) return;
+				this.fadeStaticGain(baseTarget, Math.max(30, Math.floor(duck.durationMs * 0.65)), token);
+			}, duck.durationMs);
 			this.scheduleMicroMuteTick();
 		}, waitMs);
 	},
 	updateMicroMute() {
-		if (!this.play || !STATIC_CFG.microMute.enabled) {
+		if (!this.runtime.play || !APP_CONFIG.audio.static.microMute.enabled) {
 			this.clearMicroMuteTimer();
 			return;
 		}
 		this.scheduleMicroMuteTick();
 	},
 	applyWordWindowBurst(token, baseTarget) {
-		const cfg = STATIC_CFG.wordWindow;
-		if (!cfg.enabled || !this.staticGain) return;
-		const duckTarget = this.clampVolume(baseTarget * clampValue(cfg.duckRatio, 0, 1));
-		this.fadeStaticGain(duckTarget, Math.max(18, cfg.preMs), token);
+		const cfg = APP_CONFIG.audio.static.wordWindow;
+		if (!cfg.enabled || !this.static.gain) return;
+		const duck = {
+			target: this.clampVolume(baseTarget * clampValue(cfg.duckRatio, 0, 1)),
+		};
+		this.fadeStaticGain(duck.target, Math.max(18, cfg.preMs), token);
 		setTimeout(() => {
-			if (token !== this.fadeToken || !this.staticGain) return;
+			if (token !== this.ui.runtime.fadeToken || !this.static.gain) return;
 			this.fadeStaticGain(baseTarget, Math.max(30, cfg.recoverMs), token);
 		}, cfg.preMs);
 		setTimeout(() => {
-			if (token !== this.fadeToken || !this.staticGain) return;
-			this.fadeStaticGain(duckTarget, Math.max(18, Math.floor(cfg.preMs * 0.8)), token);
+			if (token !== this.ui.runtime.fadeToken || !this.static.gain) return;
+			this.fadeStaticGain(duck.target, Math.max(18, Math.floor(cfg.preMs * 0.8)), token);
 			setTimeout(() => {
-				if (token !== this.fadeToken || !this.staticGain) return;
+				if (token !== this.ui.runtime.fadeToken || !this.static.gain) return;
 				this.fadeStaticGain(baseTarget, Math.max(30, cfg.recoverMs), token);
 			}, Math.max(18, Math.floor(cfg.preMs * 0.8)));
 		}, cfg.postMs);
 	},
-	getWarmStationIndexes(anchorIndex = this.index) {
+	getWarmStationIndexes(anchorIndex = this.runtime.index) {
 		const count = this.stations.length;
-		const warmCount = Math.min(Math.max(1, this.streamPrewarmCount), count);
+		const warmCount = Math.min(Math.max(1, this.static.stream.prewarmCount), count);
 		const warm = new Set();
 		if (!count) return warm;
 		const start = Math.min(Math.max(0, anchorIndex), count - 1);
@@ -879,7 +923,7 @@ const SPIRIT_APP_METHODS = {
 		}
 		return warm;
 	},
-	refreshStreamWarmPool(anchorIndex = this.index) {
+	refreshStreamWarmPool(anchorIndex = this.runtime.index) {
 		const warm = this.getWarmStationIndexes(anchorIndex);
 		for (const i of this.stations.keys()) {
 			const audio = this.getAudio(i);
@@ -898,16 +942,14 @@ const SPIRIT_APP_METHODS = {
 	chooseNextIndex() {
 		const count = this.stations.length;
 		if (count <= 1) return 0;
-		if (this.controls.sliderMotion.value === 1) {
-			const next = this.sweepCursor % count;
-			this.sweepCursor = (next + 1) % count;
-			return next;
+		if (isSweepMotion(this.controls.motion.value)) {
+			return this.chooseSweepIndex();
 		}
 		const scanNext = this.nextScanIndex(count);
 		if (scanNext !== null) return scanNext;
 		let next = Math.floor(Math.random() * count);
-		if (count > 1 && !this.isStatic) {
-			while (next === this.index) {
+		if (count > 1 && !this.static.active) {
+			while (next === this.runtime.index) {
 				next = Math.floor(Math.random() * count);
 			}
 		}
@@ -915,7 +957,24 @@ const SPIRIT_APP_METHODS = {
 	},
 	chooseStaticPosition(targetIndex = null) {
 		if (this.controls.stations.value <= 1) return 0;
+		if (isSweepMotion(this.controls.motion.value) && targetIndex == null) {
+			if (this.sweep.bandSlots?.length <= 1) return 0;
+			return this.sweep.currentBandIndex / (this.sweep.bandSlots.length - 1);
+		}
 		if (Number.isFinite(targetIndex)) {
+			if (isSweepMotion(this.controls.motion.value)) {
+				if (this.sweep.bandSlots?.length > 1) {
+					const slotsLen = this.sweep.bandSlots.length;
+					for (let offset = 0; offset < slotsLen; offset++) {
+						const right = (this.sweep.currentBandIndex + offset) % slotsLen;
+						if (this.sweep.bandSlots[right] === targetIndex) return right / (slotsLen - 1);
+						const left = (this.sweep.currentBandIndex - offset + slotsLen) % slotsLen;
+						if (this.sweep.bandSlots[left] === targetIndex) return left / (slotsLen - 1);
+					}
+				}
+				const pos = this.sweep.stationBandPositions?.[targetIndex];
+				if (Number.isFinite(pos)) return pos;
+			}
 			const clamped = Math.max(0, Math.min(this.controls.stations.value - 1, targetIndex));
 			return clamped;
 		}
@@ -923,15 +982,26 @@ const SPIRIT_APP_METHODS = {
 		const between = 0.15 + Math.random() * 0.7;
 		return base + between;
 	},
-	updateSliderMotion() {
-		this.controls.sliderMotion.value = clampModeIndex(this.controls.sliderMotion.value, this.controls.sliderMotion.max);
-		if (this.controls.sliderMotion.value === 1 && this.stations.length) {
-			this.sweepCursor = this.isStatic ? 0 : (this.index + 1) % this.stations.length;
+	updateMotion() {
+		this.controls.motion.value = normalizeOptionValue(
+			this.controls.motion.value,
+			this.controls.motion.options,
+			this.controls.motion.default
+		);
+		if (isSweepMotion(this.controls.motion.value) && this.stations.length) {
+			this.sweep.cursor = this.static.active ? 0 : (this.runtime.index + 1) % this.stations.length;
+			if (this.sweep.bandSlots?.length) {
+				const found = this.sweep.bandSlots.findIndex((stationIndex) => stationIndex === this.sweep.cursor);
+				if (found !== -1) {
+					this.sweep.bandIndex = found;
+					this.sweep.currentBandIndex = found;
+				}
+			}
 		}
 	},
 	shouldPlayStatic() {
-		if (!this.play || !this.stations.length) return false;
-		this.controls.stationDensity.value = clampValue(this.controls.stationDensity.value, this.controls.stationDensity.min, this.controls.stationDensity.max);
+		if (!this.runtime.play || !this.stations.length) return false;
+		this.controls.stationDensity.value = clampControl(this.controls.stationDensity);
 		const staticChance = 100 - this.controls.stationDensity.value;
 		if (staticChance <= 0) return false;
 		return Math.random() * 100 < staticChance;
@@ -940,8 +1010,8 @@ const SPIRIT_APP_METHODS = {
 		return Math.max(0, Math.min(1, value));
 	},
 	beginTransition() {
-		this.fadeToken += 1;
-		return this.fadeToken;
+		this.ui.runtime.fadeToken += 1;
+		return this.ui.runtime.fadeToken;
 	},
 	fadeStation(index, target, durationMs, token) {
 		const audio = this.getAudio(index);
@@ -956,7 +1026,7 @@ const SPIRIT_APP_METHODS = {
 		this.playSilently(audio);
 		const start = performance.now();
 		const step = (now) => {
-			if (token !== this.fadeToken) return;
+			if (token !== this.ui.runtime.fadeToken) return;
 			const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
 			const eased = t * (2 - t);
 			const value = this.clampVolume(from + (to - from) * eased);
@@ -967,120 +1037,120 @@ const SPIRIT_APP_METHODS = {
 		requestAnimationFrame(step);
 	},
 	fadeStaticGain(target, durationMs, token, stopWhenSilent = false) {
-		if (!this.staticGain) return;
+		if (!this.static.gain) return;
 		const to = this.clampVolume(target);
-		const from = this.clampVolume(this.staticGain.gain.value || 0);
+		const from = this.clampVolume(this.static.gain.gain.value || 0);
 		if (Math.abs(from - to) < 0.002) {
-			this.staticGain.gain.value = to;
-			if (stopWhenSilent && to <= 0.001 && token === this.fadeToken) this.stopStatic();
+			this.static.gain.gain.value = to;
+			if (stopWhenSilent && to <= 0.001 && token === this.ui.runtime.fadeToken) this.stopStatic();
 			return;
 		}
 		const start = performance.now();
 		const step = (now) => {
-			if (token !== this.fadeToken) return;
+			if (token !== this.ui.runtime.fadeToken) return;
 			const t = durationMs <= 0 ? 1 : Math.min(1, (now - start) / durationMs);
 			const eased = t * (2 - t);
-			this.staticGain.gain.value = this.clampVolume(from + (to - from) * eased);
+			this.static.gain.gain.value = this.clampVolume(from + (to - from) * eased);
 			if (t < 1) {
 				requestAnimationFrame(step);
 				return;
 			}
-			if (stopWhenSilent && this.staticGain.gain.value <= 0.001 && token === this.fadeToken) {
+			if (stopWhenSilent && this.static.gain.gain.value <= 0.001 && token === this.ui.runtime.fadeToken) {
 				this.stopStatic();
 			}
 		};
 		requestAnimationFrame(step);
 	},
 	staticTargetGain() {
-		return this.clampVolume((this.controls.volume.value / 100) * this.staticLevelFactor);
+		return this.clampVolume((this.controls.volume.value / 100) * this.static.levelFactor);
 	},
 	retuneStaticTexture(advanceDrift = true) {
-		if (!this.staticFilter) return;
+		if (!this.static.filter) return;
 		const context = getAudioContext();
 		const now = context.currentTime;
 		const toneVariance = getStaticToneVariance();
 		if (advanceDrift) this.advanceStaticDrift();
-		const drift = this.staticToneDrift * toneVariance;
-		const wowCfg = STATIC_CFG.tone.wowFlutter;
+		const drift = this.static.tone.drift * toneVariance;
+		const wowCfg = APP_CONFIG.audio.static.tone.wowFlutter;
 		if (wowCfg.enabled) {
-			this.staticHumPhase += randomBetween(0.8, 1.2) * wowCfg.speedHz;
+			this.static.hum.phase += randomBetween(0.8, 1.2) * wowCfg.speedHz;
 		}
-		const wowHz = wowCfg.enabled ? Math.sin(this.staticHumPhase) * wowCfg.depthHz : 0;
+		const wowHz = wowCfg.enabled ? Math.sin(this.static.hum.phase) * wowCfg.depthHz : 0;
 		const targetFrequency = varyTone(
-			STATIC_CFG.tone.frequency.center + drift * STATIC_CFG.tone.frequency.spread + wowHz,
-			STATIC_CFG.tone.frequency.spread * 0.1,
+			APP_CONFIG.audio.static.tone.frequency.center + drift * APP_CONFIG.audio.static.tone.frequency.spread + wowHz,
+			APP_CONFIG.audio.static.tone.frequency.spread * 0.1,
 			toneVariance,
-			STATIC_CFG.tone.frequency.center - STATIC_CFG.tone.frequency.spread,
-			STATIC_CFG.tone.frequency.center + STATIC_CFG.tone.frequency.spread
+			APP_CONFIG.audio.static.tone.frequency.center - APP_CONFIG.audio.static.tone.frequency.spread,
+			APP_CONFIG.audio.static.tone.frequency.center + APP_CONFIG.audio.static.tone.frequency.spread
 		);
 		const targetQ = varyTone(
-			STATIC_CFG.tone.q.center + drift * STATIC_CFG.tone.q.spread,
-			STATIC_CFG.tone.q.spread * 0.1,
+			APP_CONFIG.audio.static.tone.q.center + drift * APP_CONFIG.audio.static.tone.q.spread,
+			APP_CONFIG.audio.static.tone.q.spread * 0.1,
 			toneVariance,
-			STATIC_CFG.tone.q.center - STATIC_CFG.tone.q.spread,
-			STATIC_CFG.tone.q.center + STATIC_CFG.tone.q.spread
+			APP_CONFIG.audio.static.tone.q.center - APP_CONFIG.audio.static.tone.q.spread,
+			APP_CONFIG.audio.static.tone.q.center + APP_CONFIG.audio.static.tone.q.spread
 		);
 		const {min, max} = getStaticLevelBounds();
-		this.staticFilter.frequency.setTargetAtTime(targetFrequency, now, 0.06);
-		this.staticFilter.Q.setTargetAtTime(targetQ, now, 0.08);
-		this.staticLevelFactor = clampValue(this.staticLevelFactor + (Math.random() - 0.5) * 0.02, min, max);
-		this.applyNoiseProfile(this.buildNoiseProfile(this.staticToneDrift));
+		this.static.filter.frequency.setTargetAtTime(targetFrequency, now, 0.06);
+		this.static.filter.Q.setTargetAtTime(targetQ, now, 0.08);
+		this.static.levelFactor = clampValue(this.static.levelFactor + (Math.random() - 0.5) * 0.02, min, max);
+		this.applyNoiseProfile(this.buildNoiseProfile(this.static.tone.drift));
 		this.retuneHum();
 	},
 	async startStatic() {
-		if (this.staticNode && this.staticFilter && this.staticGain) return;
-		if (this.staticInitPromise) return this.staticInitPromise;
-		this.staticInitPromise = (async () => {
+		if (this.static.node && this.static.filter && this.static.gain) return;
+		if (this.static.initPromise) return this.static.initPromise;
+		this.static.initPromise = (async () => {
 			await this.ensureAudioContext();
 			const context = getAudioContext();
-			this.staticToneDrift = varyTone(0, 0.35, 1, -1, 1);
-			this.staticToneVelocity = 0;
-			const profile = this.buildNoiseProfile(this.staticToneDrift);
+			this.static.tone.drift = varyTone(0, 0.35, 1, -1, 1);
+			this.static.tone.velocity = 0;
+			const profile = this.buildNoiseProfile(this.static.tone.drift);
 			const node = this.createNoiseNode(profile);
 			const filter = context.createBiquadFilter();
 			filter.type = 'bandpass';
-			filter.frequency.value = STATIC_CFG.tone.frequency.center;
-			filter.Q.value = STATIC_CFG.tone.q.center;
+			filter.frequency.value = APP_CONFIG.audio.static.tone.frequency.center;
+			filter.Q.value = APP_CONFIG.audio.static.tone.q.center;
 			const gain = context.createGain();
 			gain.gain.value = 0;
 			node.connect(filter);
 			filter.connect(gain);
 			gain.connect(context.destination);
-			this.staticNode = node;
-			this.staticFilter = filter;
-			this.staticGain = gain;
+			this.static.node = node;
+			this.static.filter = filter;
+			this.static.gain = gain;
 			this.startHumBed();
 			const {min, max} = getStaticLevelBounds();
-			this.staticLevelFactor = randomBetween(min, max);
+			this.static.levelFactor = randomBetween(min, max);
 		})();
 		try {
-			await this.staticInitPromise;
+			await this.static.initPromise;
 		} finally {
-			this.staticInitPromise = null;
+			this.static.initPromise = null;
 		}
 	},
 	stopStatic() {
 		this.stopHumBed();
-		if (this.staticNode) {
-			try { this.staticNode.disconnect(); } catch {}
+		if (this.static.node) {
+			try { this.static.node.disconnect(); } catch {}
 		}
-		if (this.staticFilter) {
-			try { this.staticFilter.disconnect(); } catch {}
+		if (this.static.filter) {
+			try { this.static.filter.disconnect(); } catch {}
 		}
-		if (this.staticGain) {
-			try { this.staticGain.disconnect(); } catch {}
+		if (this.static.gain) {
+			try { this.static.gain.disconnect(); } catch {}
 		}
-		this.staticNode = null;
-		this.staticFilter = null;
-		this.staticGain = null;
+		this.static.node = null;
+		this.static.filter = null;
+		this.static.gain = null;
 	},
 	playStatic(targetIndex = null) {
-		const wasStatic = this.isStatic;
+		const wasStatic = this.static.active;
 		const token = this.beginTransition();
-		this.isStatic = true;
-		this.staticPosition = this.chooseStaticPosition(targetIndex);
+		this.static.active = true;
+		this.static.position = this.chooseStaticPosition(targetIndex);
 		this.syncNeedle();
-		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.stationToStaticMs * 0.7)) : this.stationToStaticMs;
+		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.ui.needle.transitions.stationToStaticMs * 0.7)) : this.ui.needle.transitions.stationToStaticMs;
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, 0, fadeMs, token);
 		}
@@ -1089,7 +1159,7 @@ const SPIRIT_APP_METHODS = {
 			this.fadeStaticGain(this.staticTargetGain(), fadeMs, token);
 			this.setStaticHumTarget();
 		};
-		if (this.staticNode && this.staticFilter && this.staticGain) {
+		if (this.static.node && this.static.filter && this.static.gain) {
 			applyStaticFade();
 			return;
 		}
@@ -1098,30 +1168,30 @@ const SPIRIT_APP_METHODS = {
 		});
 	},
 	playStation(index) {
-		const wasStatic = this.isStatic;
+		const wasStatic = this.static.active;
 		const token = this.beginTransition();
 		const targetVolume = this.clampVolume(this.controls.volume.value / 100);
 		const staticBedTarget = this.stationBedStaticTarget();
-		this.isStatic = false;
-		this.index = index;
+		this.static.active = false;
+		this.runtime.index = index;
 		this.syncNeedle();
 		this.refreshStreamWarmPool(index);
-		const fadeMs = wasStatic ? this.staticToStationMs : this.stationToStationMs;
+		const fadeMs = wasStatic ? this.ui.needle.transitions.staticToStationMs : this.ui.needle.transitions.stationToStationMs;
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, i === index ? targetVolume : 0, fadeMs, token);
 		}
 		const applyStaticBed = () => {
 			this.retuneStaticTexture();
-			this.fadeStaticGain(staticBedTarget, wasStatic ? fadeMs : this.stationToStationMs, token, false);
+			this.fadeStaticGain(staticBedTarget, wasStatic ? fadeMs : this.ui.needle.transitions.stationToStationMs, token, false);
 			this.setStaticHumTarget();
 			this.applyWordWindowBurst(token, staticBedTarget);
 		};
-		if (this.staticNode && this.staticFilter && this.staticGain) {
+		if (this.static.node && this.static.filter && this.static.gain) {
 			applyStaticBed();
 			return;
 		}
 		this.startStatic().then(() => {
-			if (token !== this.fadeToken) return;
+			if (token !== this.ui.runtime.fadeToken) return;
 			applyStaticBed();
 		}).catch((error) => {
 			console.warn('Background static start failed:', error?.message || error);
@@ -1136,25 +1206,25 @@ const SPIRIT_APP_METHODS = {
 		this.playStation(next);
 	},
 	nextRetuneDelay() {
-		this.controls.hopIntervalMs.value = clampValue(this.controls.hopIntervalMs.value, this.controls.hopIntervalMs.min, this.controls.hopIntervalMs.max);
-		this.controls.stationDensity.value = clampValue(this.controls.stationDensity.value, this.controls.stationDensity.min, this.controls.stationDensity.max);
-		this.controls.jitterMs.value = clampValue(this.controls.jitterMs.value, this.controls.jitterMs.min, this.controls.jitterMs.max);
+		this.controls.hopIntervalMs.value = clampControl(this.controls.hopIntervalMs);
+		this.controls.stationDensity.value = clampControl(this.controls.stationDensity);
+		this.controls.jitterMs.value = clampControl(this.controls.jitterMs);
 		const jitter = this.controls.jitterMs.value;
 		const min = Math.max(50, this.controls.hopIntervalMs.value - jitter);
 		const max = this.controls.hopIntervalMs.value + jitter;
 		return Math.floor(min + Math.random() * (max - min + 1));
 	},
 	scheduleRetuneTick() {
-		if (!this.play || !this.stations.length) return;
+		if (!this.runtime.play || !this.stations.length) return;
 		const delay = this.nextRetuneDelay();
-		this.retuneTimer = setTimeout(() => {
+		this.runtime.retuneTimer = setTimeout(() => {
 			this.playNextSelection();
 			this.scheduleRetuneTick();
 		}, delay);
 	},
 	retune() {
 		this.clearRetuneTimer();
-		if (!this.play || !this.stations.length) return;
+		if (!this.runtime.play || !this.stations.length) return;
 		this.scheduleRetuneTick();
 	},
 	getAudio(index) {
@@ -1168,13 +1238,13 @@ const SPIRIT_APP_METHODS = {
 		this.playSilently(audio);
 	},
 	startAllStreams() {
-		this.refreshStreamWarmPool(this.index);
+		this.refreshStreamWarmPool(this.runtime.index);
 	},
 	stopAllStreams() {
 		this.clearChunkTimer();
 		this.clearMicroMuteTimer();
 		this.stopStatic();
-		this.isStatic = false;
+		this.static.active = false;
 		for (let i = 0; i < this.controls.stations.value; i++) {
 			const audio = this.getAudio(i);
 			if (!audio) continue;
@@ -1184,7 +1254,7 @@ const SPIRIT_APP_METHODS = {
 		}
 	},
 	unmute(index) {
-		if (!this.play || !this.stations.length) return;
+		if (!this.runtime.play || !this.stations.length) return;
 		this.refreshStreamWarmPool(index);
 		for (const i of this.stations.keys()) {
 			this.setAudioVolume(i, 0);
@@ -1192,73 +1262,79 @@ const SPIRIT_APP_METHODS = {
 		this.setAudioVolume(index, this.controls.volume.value / 100);
 	},
 	updateVolume() {
-		if (!this.play) return;
-		this.controls.volume.value = clampValue(this.controls.volume.value, this.controls.volume.min, this.controls.volume.max);
+		if (!this.runtime.play) return;
+		this.controls.volume.value = clampControl(this.controls.volume);
 		const token = this.beginTransition();
-		if (this.isStatic && this.staticGain) {
-			this.fadeStaticGain(this.staticTargetGain(), this.volumeRampMs, token);
+		if (this.static.active && this.static.gain) {
+			this.fadeStaticGain(this.staticTargetGain(), this.ui.needle.transitions.volumeRampMs, token);
 			this.setStaticHumTarget();
 			return;
 		}
-		if (this.staticGain) {
-			this.fadeStaticGain(this.stationBedStaticTarget(), this.volumeRampMs, token);
+		if (this.static.gain) {
+			this.fadeStaticGain(this.stationBedStaticTarget(), this.ui.needle.transitions.volumeRampMs, token);
 			this.setStaticHumTarget();
 		}
 		for (const i of this.stations.keys()) {
-			this.fadeStation(i, i === this.index ? this.clampVolume(this.controls.volume.value / 100) : 0, this.volumeRampMs, token);
+			this.fadeStation(i, i === this.runtime.index ? this.clampVolume(this.controls.volume.value / 100) : 0, this.ui.needle.transitions.volumeRampMs, token);
 		}
 	},
 	updateStationCount() {
 		this.controls.stations.value = Math.max(this.controls.stations.min, Math.min(this.controls.stations.value, this.controls.stations.max));
-		const stationCount = Math.min(this.controls.stations.value, this.allStations?.length ?? 0);
+		const stationCount = Math.min(this.controls.stations.value, this.runtime.allStations?.length ?? 0);
 		if (!stationCount) return;
-		if (this.index >= stationCount) this.index = 0;
-		if (this.sweepCursor >= stationCount) this.sweepCursor = 0;
+		if (this.runtime.index >= stationCount) this.runtime.index = 0;
+		if (this.sweep.cursor >= stationCount) this.sweep.cursor = 0;
+		this.rebuildStationBand();
 		this.syncNeedle();
-		if (this.play) {
+		if (this.runtime.play) {
 			queueMicrotask(() => {
 				this.startAllStreams();
-				if (this.isStatic) this.playStatic();
-				else this.unmute(this.index);
+				if (this.static.active) this.playStatic();
+				else this.unmute(this.runtime.index);
 			});
 		}
 		this.retune();
 	},
 	shuffle() {
-		if (!this.allStations?.length) return;
-		const shuffled = [...this.allStations];
+		if (!this.runtime.allStations?.length) return;
+		const shuffled = [...this.runtime.allStations];
 		for (let i = shuffled.length - 1; i > 0; i--) {
 			const j = Math.floor(Math.random() * (i + 1));
 			[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
 		}
-		this.allStations = shuffled;
+		this.runtime.allStations = shuffled;
 	},
 	playPause() {
-		if (!this.allStations?.length) return;
-		if (this.play) {
+		if (!this.runtime.allStations?.length) return;
+		if (this.runtime.play) {
 			this.clearRetuneTimer();
 			this.clearChunkTimer();
 			this.clearMicroMuteTimer();
 			this.stopAllStreams();
-			this.play = false;
+			this.runtime.play = false;
 			return;
 		}
-		this.play = true;
-		this.updateSliderMotion();
+		this.runtime.play = true;
+		this.updateMotion();
 		this.shuffle();
+		if (isSweepMotion(this.controls.motion.value)) {
+			this.sweep.cursor = 0;
+			this.sweep.bandIndex = 0;
+			this.sweep.currentBandIndex = 0;
+		}
 		queueMicrotask(() => {
 			this.ensureAudioContext();
 			this.startAllStreams();
 			this.playNextSelection();
 			this.retune();
-			this.updateChunking();
+			this.refreshChunkingTimer();
 			this.updateMicroMute();
 		});
 	},
 	mounted() {
-		this.updateSliderMotion();
-		this.updateChunkMode();
-		this.updateStaticPreset();
+		this.updateMotion();
+		this.updateChunking();
+		this.updateStatic();
 		this.syncNeedle();
 		this.loadStations();
 	},
