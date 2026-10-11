@@ -467,6 +467,63 @@ form::after {
 	font-variant-numeric: tabular-nums;
 }
 
+.tri-hints {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	font-size: 0.66rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: rgba(255, 224, 162, 0.8);
+	margin-top: 0.2rem;
+}
+
+.tri-hints span:nth-child(2) {
+	text-align: center;
+}
+
+.tri-hints span:last-child {
+	text-align: right;
+}
+
+.tri-switch {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.32rem;
+}
+
+.tri-switch button {
+	appearance: none;
+	border: 1px solid rgba(255, 218, 153, 0.3);
+	border-radius: 8px;
+	padding: 0.34rem 0.3rem;
+	font-size: 0.67rem;
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+	letter-spacing: 0.05em;
+	text-transform: uppercase;
+	color: #e7d0a2;
+	background: linear-gradient(180deg, rgba(35, 27, 21, 0.75), rgba(18, 14, 11, 0.92));
+	box-shadow: inset 0 1px 0 rgba(255, 240, 209, 0.08);
+	cursor: pointer;
+	transition: filter 120ms ease, transform 120ms ease, border-color 120ms ease;
+}
+
+.tri-switch button:hover {
+	filter: brightness(1.08);
+}
+
+.tri-switch button.active {
+	color: #2a1b0f;
+	border-color: rgba(90, 60, 30, 0.75);
+	background: linear-gradient(180deg, #f2d7a0 0%, #b88743 55%, #7a5427 100%);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 241, 212, 0.55),
+		0 0 8px rgba(234, 177, 91, 0.25);
+}
+
+.tri-switch button:active {
+	transform: translateY(1px);
+}
+
 .volume-knob-group {
 	align-content: start;
 	justify-items: center;

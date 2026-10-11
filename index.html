@@ -45,7 +45,7 @@
 						<div class="led" :class="{red: play}" @click="onPlayClick" title="Play / Stop"></div>
 						<button id="playButton" type='button' @click.prevent="onPlayClick">{{play ? 'Stop' : 'Play'}}</button>
 					</div>
-					<div class="control-group volume-knob-group">
+					<div v-if="showVolumeControl" class="control-group volume-knob-group">
 						<label for="volumeSlider">Volume</label>
 						<div
 							class="volume-dial"
@@ -60,21 +60,34 @@
 					</div>
 				</div>
 				<div class="control-grid">
-					<div v-if="allStations?.length" class="control-group">
+					<div v-if="showStationsControl" class="control-group">
 						<label for="stationCountSlider">Stations <span>{{number}}</span></label>
-						<input id="stationCountSlider" type="range" min="4" :max="maxStations" v-model.number="number" :title="number + ' stations'" @input="updateStationCount" @change="updateStationCount" />
+						<input id="stationCountSlider" type="range" :min="stationsMin" :max="maxStations" v-model.number="number" :title="number + ' stations'" :disabled="!allStations?.length" @input="updateStationCount" @change="updateStationCount" />
 					</div>
-					<div class="control-group">
+					<div v-if="showMsControl" class="control-group">
 						<label for="switchSlider">Hop <span>{{ms}}ms</span></label>
 						<input id="switchSlider" type="range" :min="msMin" :max="msMax" :step="msStep" v-model.number="ms" :title="ms + 'ms'" @change="retune" />
 					</div>
-					<div class="control-group">
+					<div v-if="showStaticRatioControl" class="control-group">
 						<label for="staticMixSlider">Static <span>{{staticRatio}}%</span></label>
 						<input id="staticMixSlider" type="range" :min="staticRatioMin" :max="staticRatioMax" :step="staticRatioStep" v-model.number="staticRatio" :title="staticRatio + '%'" />
 					</div>
-					<div class="control-group">
+					<div v-if="showJitterControl" class="control-group">
 						<label for="jitterSlider">Jitter <span>+/-{{jitterMs}}ms</span></label>
 						<input id="jitterSlider" type="range" :min="jitterMin" :max="jitterMax" :step="jitterStep" v-model.number="jitterMs" :title="'+/-' + jitterMs + 'ms'" @change="retune" />
+					</div>
+					<div v-if="showChunkModeControl" class="control-group">
+						<label for="chunkModeSlider">Chunking <span>{{chunkModeLabel}}</span></label>
+						<input id="chunkModeSlider" type="range" :min="chunkModeMin" :max="chunkModeMax" :step="chunkModeStep" v-model.number="chunkMode" :title="'Chunking ' + chunkModeLabel" @input="updateChunkMode" @change="updateChunkMode" />
+						<div class="tri-hints"><span>Off</span><span>750</span><span>1500</span></div>
+					</div>
+					<div v-if="showStaticPresetControl" class="control-group">
+						<label for="presetSwitch">Static Preset <span>{{staticPresetLabel}}</span></label>
+						<div id="presetSwitch" class="tri-switch" role="group" aria-label="Static preset">
+							<button type="button" :class="{active: staticPresetMode === 0}" @click="staticPresetMode = 0; updateStaticPreset()">Conservative</button>
+							<button type="button" :class="{active: staticPresetMode === 1}" @click="staticPresetMode = 1; updateStaticPreset()">Classic</button>
+							<button type="button" :class="{active: staticPresetMode === 2}" @click="staticPresetMode = 2; updateStaticPreset()">Aggressive</button>
+						</div>
 					</div>
 				</div>
 			</div>

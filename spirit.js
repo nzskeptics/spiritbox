@@ -6,50 +6,170 @@ import {RADIO_BROWSER_API_BASE, fetchRadioBrowserStationsWithFailover} from './r
 const APP_CONFIG = {
 	radio: {
 		bases: [RADIO_BROWSER_API_BASE],
-		offset: 0,
-		randomizeOffset: true,
-		totalTopStations: 1000,
-		pageSamplesPerLoad: 4,
-		timeoutMs: 10000,
-		retries: 2,
-		retryDelayMs: 350,
+		query: {
+			offset: 0,
+			randomizeOffset: true,
+			totalTopStations: 1000,
+			pageSamplesPerLoad: 4,
+		},
+		request: {
+			timeoutMs: 10000,
+			retries: 2,
+			retryDelayMs: 350,
+		},
+		tuning: {
+			scanBias: {
+				enabled: true,
+				biasStrength: 0.75,
+				holdStepsMin: 4,
+				holdStepsMax: 12,
+				reverseChance: 0.35,
+			},
+		},
 	},
 	audio: {
-		workletModule: './noise-worklet.js?v=20261028',
-		streamPrewarmCount: 3,
-		bufferSize: 4096,
-		staticVolumeRelative: 0.2,
-		staticVolumeVariance: 0.03,
-		staticToneVariance: 0.35,
-	},
-	defaults: {
-		maxStations: 20,
-		number: 10,
-		volume: 50,
-		ms: 300,
-		staticRatio: 50,
-		jitterMs: 50,
+		engine: {
+			workletModule: './noise-worklet.js?v=20261028',
+			streamPrewarmCount: 3,
+			bufferSize: 4096,
+		},
+		static: {
+			preset: 'classic',
+			presets: {
+				conservative: {
+					volume: {relative: 0.18, variance: 0.02, stationBedRelative: 0.03},
+					tone: {variance: 0.2, wowFlutter: {enabled: true, depthHz: 8, speedHz: 0.14}},
+					drift: {stepMin: 0.003, stepMax: 0.014, accel: 0.006, flipChance: 0.1},
+					chunking: {enabledByDefault: true, interval: {minMs: 900, maxMs: 1800}, jumpAmount: 0.55},
+					microMute: {enabled: true, intervalMinMs: 3200, intervalMaxMs: 6200, durationMinMs: 20, durationMaxMs: 54, duckMin: 0.25, duckMax: 0.5},
+					hum: {enabled: true, relativeLevel: 0.07, wanderHz: 0.09, wanderDepthHz: 0.8},
+					wordWindow: {enabled: true, duckRatio: 0.6, preMs: 45, postMs: 110, recoverMs: 100},
+				},
+				classic: {
+					volume: {relative: 0.2, variance: 0.03, stationBedRelative: 0.04},
+					tone: {variance: 0.3, wowFlutter: {enabled: true, depthHz: 12, speedHz: 0.18}},
+					drift: {stepMin: 0.005, stepMax: 0.02, accel: 0.008, flipChance: 0.12},
+					chunking: {enabledByDefault: true, interval: {minMs: 750, maxMs: 1500}, jumpAmount: 0.7},
+					microMute: {enabled: true, intervalMinMs: 2500, intervalMaxMs: 5200, durationMinMs: 24, durationMaxMs: 68, duckMin: 0.22, duckMax: 0.45},
+					hum: {enabled: true, relativeLevel: 0.08, wanderHz: 0.12, wanderDepthHz: 1.2},
+					wordWindow: {enabled: true, duckRatio: 0.5, preMs: 55, postMs: 130, recoverMs: 120},
+				},
+				aggressive: {
+					volume: {relative: 0.24, variance: 0.05, stationBedRelative: 0.06},
+					tone: {variance: 0.45, wowFlutter: {enabled: true, depthHz: 18, speedHz: 0.24}},
+					drift: {stepMin: 0.008, stepMax: 0.03, accel: 0.012, flipChance: 0.18},
+					chunking: {enabledByDefault: true, interval: {minMs: 550, maxMs: 1200}, jumpAmount: 0.82},
+					microMute: {enabled: true, intervalMinMs: 1800, intervalMaxMs: 4200, durationMinMs: 28, durationMaxMs: 82, duckMin: 0.16, duckMax: 0.4},
+					hum: {enabled: true, relativeLevel: 0.1, wanderHz: 0.18, wanderDepthHz: 1.8},
+					wordWindow: {enabled: true, duckRatio: 0.42, preMs: 70, postMs: 170, recoverMs: 135},
+				},
+			},
+			volume: {
+				relative: 0.2,
+				variance: 0.03,
+				stationBedRelative: 0.04,
+			},
+			tone: {
+				variance: 0.3,
+				frequency: {
+					center: 980,
+					spread: 120,
+				},
+				q: {
+					center: 1.0,
+					spread: 0.22,
+				},
+				wowFlutter: {
+					enabled: true,
+					depthHz: 12,
+					speedHz: 0.18,
+				},
+			},
+			drift: {
+				stepMin: 0.005,
+				stepMax: 0.02,
+				accel: 0.008,
+				flipChance: 0.12,
+			},
+			chunking: {
+				enabledByDefault: true,
+				interval: {
+					minMs: 750,
+					maxMs: 1500,
+				},
+				jumpAmount: 0.7,
+				uiRange: {
+					min: 250,
+					max: 2500,
+					step: 50,
+				},
+			},
+			microMute: {
+				enabled: true,
+				intervalMinMs: 2500,
+				intervalMaxMs: 5200,
+				durationMinMs: 24,
+				durationMaxMs: 68,
+				duckMin: 0.22,
+				duckMax: 0.45,
+			},
+			hum: {
+				enabled: true,
+				baseHz: 58,
+				overtoneHz: 116,
+				relativeLevel: 0.08,
+				wanderHz: 0.12,
+				wanderDepthHz: 1.2,
+			},
+			wordWindow: {
+				enabled: true,
+				duckRatio: 0.5,
+				preMs: 55,
+				postMs: 130,
+				recoverMs: 120,
+			},
+		},
 	},
 	controls: {
 		volume: {
 			min: 0,
 			max: 100,
 			step: 1,
+			default: 50,
+			visible: true,
 		},
-		ms: {
-			min: 200,
-			max: 1000,
-			step: 100,
+		stations: {
+			min: 4,
+			max: 20,
+			default: 10,
+			visible: true,
+		},
+		hopIntervalMs: {
+			min: 50,
+			max: 500,
+			step: 50,
+			default: 100,
+			visible: true,
 		},
 		staticRatio: {
 			min: 0,
 			max: 100,
 			step: 5,
+			default: 80,
+			visible: true,
 		},
 		jitterMs: {
 			min: 0,
 			max: 200,
 			step: 5,
+			default: 0,
+			visible: false,
+		},
+		chunkMode: {
+			visible: true,
+		},
+		staticPreset: {
+			visible: true,
 		},
 	},
 	ui: {
@@ -65,6 +185,37 @@ const APP_CONFIG = {
 	},
 };
 
+function applyStaticPreset(config, nextPresetName) {
+	const staticConfig = config?.audio?.static;
+	if (!staticConfig) return false;
+	const presetName = nextPresetName || staticConfig.preset;
+	const preset = staticConfig.presets?.[presetName];
+	if (!preset) return false;
+	staticConfig.preset = presetName;
+
+	const mergeInto = (target, source) => {
+		for (const [key, value] of Object.entries(source)) {
+			if (value && typeof value === 'object' && !Array.isArray(value)) {
+				if (!target[key] || typeof target[key] !== 'object' || Array.isArray(target[key])) target[key] = {};
+				mergeInto(target[key], value);
+				continue;
+			}
+			target[key] = value;
+		}
+	};
+
+	mergeInto(staticConfig, preset);
+	return true;
+}
+
+applyStaticPreset(APP_CONFIG);
+
+const RADIO_QUERY = APP_CONFIG.radio.query;
+const RADIO_REQUEST = APP_CONFIG.radio.request;
+const SCAN_BIAS = APP_CONFIG.radio.tuning.scanBias;
+const AUDIO_ENGINE = APP_CONFIG.audio.engine;
+const STATIC_CFG = APP_CONFIG.audio.static;
+
 let audioContext = null;
 let noiseWorkletReady = false;
 let noiseWorkletLoadingPromise = null;
@@ -77,14 +228,20 @@ function getAudioContext() {
 }
 
 function createScriptNoiseNode(context, profile) {
-	const lowpass = profile.lowpass;
-	const hiss = profile.hiss;
-	const crackleChance = profile.crackleChance;
+	let lowpass = profile.lowpass;
+	let hiss = profile.hiss;
+	let crackleChance = profile.crackleChance;
 	let last = 0;
-	const node = context.createScriptProcessor(APP_CONFIG.audio.bufferSize, 1, 1);
+	const node = context.createScriptProcessor(AUDIO_ENGINE.bufferSize, 1, 1);
+	node.setProfile = function(nextProfile) {
+		if (!nextProfile) return;
+		if (Number.isFinite(nextProfile.lowpass)) lowpass = nextProfile.lowpass;
+		if (Number.isFinite(nextProfile.hiss)) hiss = nextProfile.hiss;
+		if (Number.isFinite(nextProfile.crackleChance)) crackleChance = nextProfile.crackleChance;
+	};
 	node.onaudioprocess = function(e) {
 		const output = e.outputBuffer.getChannelData(0);
-		for (let i = 0; i < APP_CONFIG.audio.bufferSize; i++) {
+		for (let i = 0; i < AUDIO_ENGINE.bufferSize; i++) {
 			const white = Math.random() * 2 - 1;
 			last = last * lowpass + white * (1 - lowpass);
 			let sample = last * (1 - hiss) + white * hiss;
@@ -102,7 +259,7 @@ async function ensureNoiseWorkletLoaded(context) {
 	if (noiseWorkletReady) return true;
 	if (!noiseWorkletLoadingPromise) {
 		noiseWorkletLoadingPromise = context.audioWorklet
-			.addModule(APP_CONFIG.audio.workletModule)
+			.addModule(AUDIO_ENGINE.workletModule)
 			.then(() => {
 				noiseWorkletReady = true;
 				return true;
@@ -125,8 +282,8 @@ function clampValue(value, min, max) {
 }
 
 function getStaticLevelBounds() {
-	const base = clampValue(APP_CONFIG.audio.staticVolumeRelative, 0, 1);
-	const variance = Math.max(0, Number(APP_CONFIG.audio.staticVolumeVariance) || 0);
+	const base = clampValue(STATIC_CFG.volume.relative, 0, 1);
+	const variance = Math.max(0, Number(STATIC_CFG.volume.variance) || 0);
 	return {
 		min: clampValue(base - variance, 0, 1),
 		max: clampValue(base + variance, 0, 1),
@@ -139,12 +296,62 @@ function randomBetween(min, max) {
 }
 
 function getStaticToneVariance() {
-	return clampValue(APP_CONFIG.audio.staticToneVariance, 0, 1);
+	return clampValue(STATIC_CFG.tone.variance, 0, 1);
 }
 
 function varyTone(center, halfSpread, variance, min, max) {
 	const next = center + (Math.random() * 2 - 1) * halfSpread * variance;
 	return clampValue(next, min, max);
+}
+
+function getStaticDriftConfig() {
+	const cfg = STATIC_CFG.drift;
+	const stepMin = clampValue(cfg.stepMin, 0, 1);
+	const stepMax = Math.max(stepMin, clampValue(cfg.stepMax, 0, 1));
+	return {
+		stepMin,
+		stepMax,
+		accel: clampValue(cfg.accel, 0, 1),
+		flipChance: clampValue(cfg.flipChance, 0, 1),
+	};
+}
+
+function getChunkIntervalBounds() {
+	const min = Math.max(0, Number(STATIC_CFG.chunking.interval.minMs) || 0);
+	const max = Math.max(min, Number(STATIC_CFG.chunking.interval.maxMs) || min);
+	return {min, max};
+}
+
+const CHUNK_MODE_VALUES_MS = [0, 750, 1500];
+const STATIC_PRESET_ORDER = ['conservative', 'classic', 'aggressive'];
+
+function clampModeIndex(value, maxIndex) {
+	return Math.max(0, Math.min(maxIndex, Number(value) || 0));
+}
+
+function chunkModeToMs(mode) {
+	return CHUNK_MODE_VALUES_MS[clampModeIndex(mode, CHUNK_MODE_VALUES_MS.length - 1)];
+}
+
+function chunkMsToMode(ms, enabled = true) {
+	if (!enabled || !Number.isFinite(ms) || ms <= 0) return 0;
+	if (ms >= 1125) return 2;
+	return 1;
+}
+
+function getInitialChunkMode() {
+	const bounds = getChunkIntervalBounds();
+	const avg = (bounds.min + bounds.max) / 2;
+	return chunkMsToMode(avg, Boolean(STATIC_CFG.chunking.enabledByDefault));
+}
+
+function presetModeToName(mode) {
+	return STATIC_PRESET_ORDER[clampModeIndex(mode, STATIC_PRESET_ORDER.length - 1)] || STATIC_PRESET_ORDER[1];
+}
+
+function presetNameToMode(name) {
+	const index = STATIC_PRESET_ORDER.indexOf(name);
+	return index === -1 ? 1 : index;
 }
 
 function shuffled(array) {
@@ -158,16 +365,16 @@ function shuffled(array) {
 
 function getStationPageCount(limit) {
 	const safeLimit = Math.max(1, Number(limit) || 1);
-	const poolSize = Math.max(safeLimit, Number(APP_CONFIG.radio.totalTopStations) || safeLimit);
+	const poolSize = Math.max(safeLimit, Number(RADIO_QUERY.totalTopStations) || safeLimit);
 	return Math.max(1, Math.floor(poolSize / safeLimit));
 }
 
 function getSampleOffsets(limit) {
 	const safeLimit = Math.max(1, Number(limit) || 1);
-	const baseOffset = Math.max(0, Number(APP_CONFIG.radio.offset) || 0);
-	if (!APP_CONFIG.radio.randomizeOffset) return [baseOffset];
+	const baseOffset = Math.max(0, Number(RADIO_QUERY.offset) || 0);
+	if (!RADIO_QUERY.randomizeOffset) return [baseOffset];
 	const pageCount = getStationPageCount(safeLimit);
-	const sampleCount = Math.max(1, Math.min(pageCount, Number(APP_CONFIG.radio.pageSamplesPerLoad) || 1));
+	const sampleCount = Math.max(1, Math.min(pageCount, Number(RADIO_QUERY.pageSamplesPerLoad) || 1));
 	const pages = shuffled(Array.from({length: pageCount}, (_, i) => i)).slice(0, sampleCount);
 	return pages.map((page) => baseOffset + page * safeLimit);
 }
@@ -185,9 +392,9 @@ async function getStationsFromRadioBrowser(limit) {
 				bases: APP_CONFIG.radio.bases,
 				limit: safeLimit,
 				offset,
-				timeoutMs: APP_CONFIG.radio.timeoutMs,
-				retries: APP_CONFIG.radio.retries,
-				retryDelayMs: APP_CONFIG.radio.retryDelayMs,
+				timeoutMs: RADIO_REQUEST.timeoutMs,
+				retries: RADIO_REQUEST.retries,
+				retryDelayMs: RADIO_REQUEST.retryDelayMs,
 			});
 			for (const station of result.stations) {
 				if (seenUrls.has(station.url)) continue;
@@ -222,34 +429,63 @@ createApp({
 	volumeMin: APP_CONFIG.controls.volume.min,
 	volumeMax: APP_CONFIG.controls.volume.max,
 	volumeStep: APP_CONFIG.controls.volume.step,
-	msMin: APP_CONFIG.controls.ms.min,
-	msMax: APP_CONFIG.controls.ms.max,
-	msStep: APP_CONFIG.controls.ms.step,
+	showVolumeControl: APP_CONFIG.controls.volume.visible !== false,
+	msMin: APP_CONFIG.controls.hopIntervalMs.min,
+	msMax: APP_CONFIG.controls.hopIntervalMs.max,
+	msStep: APP_CONFIG.controls.hopIntervalMs.step,
+	showMsControl: APP_CONFIG.controls.hopIntervalMs.visible !== false,
+	stationsMin: APP_CONFIG.controls.stations.min,
+	showStationsControl: APP_CONFIG.controls.stations.visible !== false,
 	staticRatioMin: APP_CONFIG.controls.staticRatio.min,
 	staticRatioMax: APP_CONFIG.controls.staticRatio.max,
 	staticRatioStep: APP_CONFIG.controls.staticRatio.step,
+	showStaticRatioControl: APP_CONFIG.controls.staticRatio.visible !== false,
 	jitterMin: APP_CONFIG.controls.jitterMs.min,
 	jitterMax: APP_CONFIG.controls.jitterMs.max,
 	jitterStep: APP_CONFIG.controls.jitterMs.step,
-	staticRatio: clampValue(APP_CONFIG.defaults.staticRatio, APP_CONFIG.controls.staticRatio.min, APP_CONFIG.controls.staticRatio.max),
-	jitterMs: clampValue(APP_CONFIG.defaults.jitterMs, APP_CONFIG.controls.jitterMs.min, APP_CONFIG.controls.jitterMs.max),
+	showJitterControl: APP_CONFIG.controls.jitterMs.visible !== false,
+	showChunkModeControl: APP_CONFIG.controls.chunkMode.visible !== false,
+	showStaticPresetControl: APP_CONFIG.controls.staticPreset.visible !== false,
+	staticRatio: clampValue(APP_CONFIG.controls.staticRatio.default, APP_CONFIG.controls.staticRatio.min, APP_CONFIG.controls.staticRatio.max),
+	jitterMs: clampValue(APP_CONFIG.controls.jitterMs.default, APP_CONFIG.controls.jitterMs.min, APP_CONFIG.controls.jitterMs.max),
 	isStatic: false,
 	staticPosition: 0,
 	staticNode: null,
 	staticFilter: null,
 	staticGain: null,
 	staticInitPromise: null,
-	staticLevelFactor: clampValue(APP_CONFIG.audio.staticVolumeRelative, 0, 1),
-	streamPrewarmCount: APP_CONFIG.audio.streamPrewarmCount,
-	maxStations: Math.max(1, APP_CONFIG.defaults.maxStations),
-	number: Math.max(1, Math.min(APP_CONFIG.defaults.number, APP_CONFIG.defaults.maxStations)),
-	volume: clampValue(APP_CONFIG.defaults.volume, APP_CONFIG.controls.volume.min, APP_CONFIG.controls.volume.max),
-	ms: clampValue(APP_CONFIG.defaults.ms, APP_CONFIG.controls.ms.min, APP_CONFIG.controls.ms.max),
+	staticHumOscA: null,
+	staticHumOscB: null,
+	staticHumGain: null,
+	staticHumPhase: 0,
+	staticLevelFactor: clampValue(STATIC_CFG.volume.relative, 0, 1),
+	staticToneDrift: 0,
+	staticToneVelocity: 0,
+	chunkingEnabled: Boolean(STATIC_CFG.chunking.enabledByDefault),
+	chunkModeMin: 0,
+	chunkModeMax: CHUNK_MODE_VALUES_MS.length - 1,
+	chunkModeStep: 1,
+	chunkMode: getInitialChunkMode(),
+	chunkIntervalMinMs: getChunkIntervalBounds().min,
+	chunkIntervalMaxMs: getChunkIntervalBounds().max,
+	staticPresetMin: 0,
+	staticPresetMax: STATIC_PRESET_ORDER.length - 1,
+	staticPresetStep: 1,
+	staticPresetMode: presetNameToMode(STATIC_CFG.preset),
+	chunkTimer: null,
+	microMuteTimer: null,
+	scanDirection: Math.random() < 0.5 ? -1 : 1,
+	scanRunRemaining: 0,
+	streamPrewarmCount: AUDIO_ENGINE.streamPrewarmCount,
+	maxStations: Math.max(1, APP_CONFIG.controls.stations.max),
+	number: Math.max(APP_CONFIG.controls.stations.min, Math.min(APP_CONFIG.controls.stations.default, APP_CONFIG.controls.stations.max)),
+	volume: clampValue(APP_CONFIG.controls.volume.default, APP_CONFIG.controls.volume.min, APP_CONFIG.controls.volume.max),
+	ms: clampValue(APP_CONFIG.controls.hopIntervalMs.default, APP_CONFIG.controls.hopIntervalMs.min, APP_CONFIG.controls.hopIntervalMs.max),
 	index: 0,
 	allStations: null,
 	retuneTimer: null,
 	play: false,
-	times: [200, 400, 600, 800, 1000],
+	times: [50, 100, 250, 500, 750, 1000],
 	playSilently(audio) {
 		if (!audio?.paused) return;
 		const playPromise = audio.play?.();
@@ -300,6 +536,19 @@ createApp({
 	},
 	get stations() {
 		return this.allStations?.slice(0, this.number) ?? [];
+	},
+	get chunkModeMs() {
+		return chunkModeToMs(this.chunkMode);
+	},
+	get chunkModeLabel() {
+		return this.chunkModeMs === 0 ? 'Off' : `${this.chunkModeMs}ms`;
+	},
+	get staticPresetName() {
+		return presetModeToName(this.staticPresetMode);
+	},
+	get staticPresetLabel() {
+		const name = this.staticPresetName;
+		return name.charAt(0).toUpperCase() + name.slice(1);
 	},
 	get station() {
 		if (!this.play || this.isStatic) return null;
@@ -383,6 +632,212 @@ createApp({
 		}
 		return createScriptNoiseNode(context, profile);
 	},
+	applyNoiseProfile(profile) {
+		if (!this.staticNode || !profile) return;
+		if (typeof this.staticNode.setProfile === 'function') {
+			this.staticNode.setProfile(profile);
+			return;
+		}
+		if (this.staticNode.port?.postMessage) {
+			this.staticNode.port.postMessage({type: 'set-profile', profile});
+		}
+	},
+	buildNoiseProfile(drift = this.staticToneDrift) {
+		const toneVariance = getStaticToneVariance();
+		const driftScaled = clampValue(drift, -1, 1) * toneVariance;
+		return {
+			lowpass: varyTone(0.91 - driftScaled * 0.018, 0.012, toneVariance, 0.87, 0.95),
+			hiss: varyTone(0.34 + driftScaled * 0.025, 0.03, toneVariance, 0.26, 0.44),
+			crackleChance: varyTone(0.0018 + Math.abs(driftScaled) * 0.00045, 0.0006, toneVariance, 0.0005, 0.0034),
+		};
+	},
+	stationBedStaticTarget() {
+		const relative = clampValue(STATIC_CFG.volume.stationBedRelative, 0, 1);
+		return this.clampVolume((this.volume / 100) * relative);
+	},
+	setStaticHumTarget() {
+		if (!STATIC_CFG.hum.enabled || !this.staticHumGain) return;
+		const target = this.clampVolume((this.isStatic ? this.staticTargetGain() : this.stationBedStaticTarget()) * STATIC_CFG.hum.relativeLevel);
+		this.staticHumGain.gain.setTargetAtTime(target, getAudioContext().currentTime, 0.08);
+	},
+	retuneHum() {
+		if (!STATIC_CFG.hum.enabled || !this.staticHumOscA || !this.staticHumOscB) return;
+		const context = getAudioContext();
+		const now = context.currentTime;
+		this.staticHumPhase += randomBetween(0.6, 1.4) * STATIC_CFG.hum.wanderHz;
+		const wobble = Math.sin(this.staticHumPhase) * STATIC_CFG.hum.wanderDepthHz;
+		this.staticHumOscA.frequency.setTargetAtTime(STATIC_CFG.hum.baseHz + wobble, now, 0.2);
+		this.staticHumOscB.frequency.setTargetAtTime(STATIC_CFG.hum.overtoneHz + wobble * 0.85, now, 0.24);
+	},
+	startHumBed() {
+		if (!STATIC_CFG.hum.enabled || this.staticHumOscA || this.staticHumOscB) return;
+		const context = getAudioContext();
+		const humGain = context.createGain();
+		humGain.gain.value = 0;
+		const oscA = context.createOscillator();
+		oscA.type = 'sine';
+		oscA.frequency.value = STATIC_CFG.hum.baseHz;
+		const oscB = context.createOscillator();
+		oscB.type = 'triangle';
+		oscB.frequency.value = STATIC_CFG.hum.overtoneHz;
+		oscA.connect(humGain);
+		oscB.connect(humGain);
+		humGain.connect(this.staticGain);
+		oscA.start();
+		oscB.start();
+		this.staticHumGain = humGain;
+		this.staticHumOscA = oscA;
+		this.staticHumOscB = oscB;
+		this.setStaticHumTarget();
+	},
+	stopHumBed() {
+		if (this.staticHumOscA) {
+			try { this.staticHumOscA.stop(); } catch {}
+			try { this.staticHumOscA.disconnect(); } catch {}
+		}
+		if (this.staticHumOscB) {
+			try { this.staticHumOscB.stop(); } catch {}
+			try { this.staticHumOscB.disconnect(); } catch {}
+		}
+		if (this.staticHumGain) {
+			try { this.staticHumGain.disconnect(); } catch {}
+		}
+		this.staticHumOscA = null;
+		this.staticHumOscB = null;
+		this.staticHumGain = null;
+	},
+	resetScanRun() {
+		if (!SCAN_BIAS.enabled) return;
+		if (Math.random() < SCAN_BIAS.reverseChance) this.scanDirection *= -1;
+		this.scanRunRemaining = Math.floor(randomBetween(SCAN_BIAS.holdStepsMin, SCAN_BIAS.holdStepsMax + 1));
+	},
+	nextScanIndex(count) {
+		if (!SCAN_BIAS.enabled || count <= 1) return null;
+		if (this.scanRunRemaining <= 0) this.resetScanRun();
+		this.scanRunRemaining = Math.max(0, this.scanRunRemaining - 1);
+		if (Math.random() > SCAN_BIAS.biasStrength) return null;
+		return (this.index + this.scanDirection + count) % count;
+	},
+	advanceStaticDrift() {
+		const driftCfg = getStaticDriftConfig();
+		if (Math.random() < driftCfg.flipChance) {
+			this.staticToneVelocity *= -0.6;
+		}
+		this.staticToneVelocity += (Math.random() * 2 - 1) * driftCfg.accel;
+		const maxStep = randomBetween(driftCfg.stepMin, driftCfg.stepMax);
+		this.staticToneVelocity = clampValue(this.staticToneVelocity, -maxStep, maxStep);
+		this.staticToneDrift = clampValue(this.staticToneDrift + this.staticToneVelocity, -1, 1);
+	},
+	nextChunkDelay() {
+		this.chunkIntervalMinMs = Math.max(0, Number(this.chunkIntervalMinMs) || 0);
+		this.chunkIntervalMaxMs = Math.max(this.chunkIntervalMinMs, Number(this.chunkIntervalMaxMs) || this.chunkIntervalMinMs);
+		return Math.floor(randomBetween(this.chunkIntervalMinMs, this.chunkIntervalMaxMs));
+	},
+	clearChunkTimer() {
+		clearTimeout(this.chunkTimer);
+		this.chunkTimer = null;
+	},
+	clearMicroMuteTimer() {
+		clearTimeout(this.microMuteTimer);
+		this.microMuteTimer = null;
+	},
+	applyChunkJump() {
+		const jumpAmount = clampValue(STATIC_CFG.chunking.jumpAmount, 0, 1);
+		const target = randomBetween(-1, 1);
+		this.staticToneDrift = clampValue(this.staticToneDrift + (target - this.staticToneDrift) * jumpAmount, -1, 1);
+		if (Math.random() < 0.5) this.staticToneVelocity *= -0.5;
+		this.retuneStaticTexture(false);
+	},
+	scheduleChunkTick() {
+		this.clearChunkTimer();
+		if (!this.play || !this.chunkingEnabled) return;
+		const delay = this.nextChunkDelay();
+		this.chunkTimer = setTimeout(() => {
+			if (!this.play || !this.chunkingEnabled) {
+				this.clearChunkTimer();
+				return;
+			}
+			this.startStatic().then(() => {
+				this.applyChunkJump();
+			}).catch(() => {});
+			this.scheduleChunkTick();
+		}, delay);
+	},
+	updateChunking() {
+		if (!this.play || !this.chunkingEnabled) {
+			this.clearChunkTimer();
+			return;
+		}
+		this.scheduleChunkTick();
+	},
+	updateChunkMode() {
+		this.chunkMode = clampModeIndex(this.chunkMode, this.chunkModeMax);
+		const ms = this.chunkModeMs;
+		this.chunkingEnabled = ms > 0;
+		this.chunkIntervalMinMs = ms;
+		this.chunkIntervalMaxMs = ms;
+		this.updateChunking();
+	},
+	updateStaticPreset() {
+		this.staticPresetMode = clampModeIndex(this.staticPresetMode, this.staticPresetMax);
+		const name = this.staticPresetName;
+		if (!applyStaticPreset(APP_CONFIG, name)) return;
+		if (this.chunkMode !== 0) this.updateChunkMode();
+		if (this.staticNode && this.staticFilter && this.staticGain) {
+			this.retuneStaticTexture(false);
+			this.setStaticHumTarget();
+		}
+		this.updateMicroMute();
+		this.updateChunking();
+	},
+	scheduleMicroMuteTick() {
+		this.clearMicroMuteTimer();
+		const cfg = STATIC_CFG.microMute;
+		if (!this.play || !cfg.enabled) return;
+		const waitMs = Math.floor(randomBetween(cfg.intervalMinMs, cfg.intervalMaxMs));
+		this.microMuteTimer = setTimeout(() => {
+			if (!this.play || !cfg.enabled) {
+				this.clearMicroMuteTimer();
+				return;
+			}
+			const token = this.fadeToken;
+			const baseTarget = this.isStatic ? this.staticTargetGain() : this.stationBedStaticTarget();
+			const duckFactor = randomBetween(cfg.duckMin, cfg.duckMax);
+			const duckTarget = this.clampVolume(baseTarget * duckFactor);
+			const dur = Math.floor(randomBetween(cfg.durationMinMs, cfg.durationMaxMs));
+			this.fadeStaticGain(duckTarget, Math.max(18, Math.floor(dur * 0.35)), token);
+			setTimeout(() => {
+				if (token !== this.fadeToken) return;
+				this.fadeStaticGain(baseTarget, Math.max(30, Math.floor(dur * 0.65)), token);
+			}, dur);
+			this.scheduleMicroMuteTick();
+		}, waitMs);
+	},
+	updateMicroMute() {
+		if (!this.play || !STATIC_CFG.microMute.enabled) {
+			this.clearMicroMuteTimer();
+			return;
+		}
+		this.scheduleMicroMuteTick();
+	},
+	applyWordWindowBurst(token, baseTarget) {
+		const cfg = STATIC_CFG.wordWindow;
+		if (!cfg.enabled || !this.staticGain) return;
+		const duckTarget = this.clampVolume(baseTarget * clampValue(cfg.duckRatio, 0, 1));
+		this.fadeStaticGain(duckTarget, Math.max(18, cfg.preMs), token);
+		setTimeout(() => {
+			if (token !== this.fadeToken || !this.staticGain) return;
+			this.fadeStaticGain(baseTarget, Math.max(30, cfg.recoverMs), token);
+		}, cfg.preMs);
+		setTimeout(() => {
+			if (token !== this.fadeToken || !this.staticGain) return;
+			this.fadeStaticGain(duckTarget, Math.max(18, Math.floor(cfg.preMs * 0.8)), token);
+			setTimeout(() => {
+				if (token !== this.fadeToken || !this.staticGain) return;
+				this.fadeStaticGain(baseTarget, Math.max(30, cfg.recoverMs), token);
+			}, Math.max(18, Math.floor(cfg.preMs * 0.8)));
+		}, cfg.postMs);
+	},
 	getWarmStationIndexes(anchorIndex = this.index) {
 		const count = this.stations.length;
 		const warmCount = Math.min(Math.max(1, this.streamPrewarmCount), count);
@@ -412,6 +867,8 @@ createApp({
 	},
 	chooseNextIndex() {
 		const count = this.stations.length;
+		const scanNext = this.nextScanIndex(count);
+		if (scanNext !== null) return scanNext;
 		let next = Math.floor(Math.random() * count);
 		if (count > 1 && !this.isStatic) {
 			while (next === this.index) {
@@ -489,17 +946,38 @@ createApp({
 	staticTargetGain() {
 		return this.clampVolume((this.volume / 100) * this.staticLevelFactor);
 	},
-	retuneStaticTexture() {
+	retuneStaticTexture(advanceDrift = true) {
 		if (!this.staticFilter) return;
 		const context = getAudioContext();
 		const now = context.currentTime;
 		const toneVariance = getStaticToneVariance();
-		const targetFrequency = varyTone(980, 110, toneVariance, 860, 1100);
-		const targetQ = varyTone(1.0, 0.22, toneVariance, 0.82, 1.25);
+		if (advanceDrift) this.advanceStaticDrift();
+		const drift = this.staticToneDrift * toneVariance;
+		const wowCfg = STATIC_CFG.tone.wowFlutter;
+		if (wowCfg.enabled) {
+			this.staticHumPhase += randomBetween(0.8, 1.2) * wowCfg.speedHz;
+		}
+		const wowHz = wowCfg.enabled ? Math.sin(this.staticHumPhase) * wowCfg.depthHz : 0;
+		const targetFrequency = varyTone(
+			STATIC_CFG.tone.frequency.center + drift * STATIC_CFG.tone.frequency.spread + wowHz,
+			STATIC_CFG.tone.frequency.spread * 0.1,
+			toneVariance,
+			STATIC_CFG.tone.frequency.center - STATIC_CFG.tone.frequency.spread,
+			STATIC_CFG.tone.frequency.center + STATIC_CFG.tone.frequency.spread
+		);
+		const targetQ = varyTone(
+			STATIC_CFG.tone.q.center + drift * STATIC_CFG.tone.q.spread,
+			STATIC_CFG.tone.q.spread * 0.1,
+			toneVariance,
+			STATIC_CFG.tone.q.center - STATIC_CFG.tone.q.spread,
+			STATIC_CFG.tone.q.center + STATIC_CFG.tone.q.spread
+		);
 		const {min, max} = getStaticLevelBounds();
 		this.staticFilter.frequency.setTargetAtTime(targetFrequency, now, 0.06);
 		this.staticFilter.Q.setTargetAtTime(targetQ, now, 0.08);
 		this.staticLevelFactor = clampValue(this.staticLevelFactor + (Math.random() - 0.5) * 0.02, min, max);
+		this.applyNoiseProfile(this.buildNoiseProfile(this.staticToneDrift));
+		this.retuneHum();
 	},
 	async startStatic() {
 		if (this.staticNode && this.staticFilter && this.staticGain) return;
@@ -507,17 +985,14 @@ createApp({
 		this.staticInitPromise = (async () => {
 			await this.ensureAudioContext();
 			const context = getAudioContext();
-			const toneVariance = getStaticToneVariance();
-			const profile = {
-				lowpass: varyTone(0.91, 0.02, toneVariance, 0.87, 0.95),
-				hiss: varyTone(0.34, 0.05, toneVariance, 0.26, 0.42),
-				crackleChance: varyTone(0.0018, 0.0012, toneVariance, 0.0005, 0.0032),
-			};
+			this.staticToneDrift = varyTone(0, 0.35, 1, -1, 1);
+			this.staticToneVelocity = 0;
+			const profile = this.buildNoiseProfile(this.staticToneDrift);
 			const node = this.createNoiseNode(profile);
 			const filter = context.createBiquadFilter();
 			filter.type = 'bandpass';
-			filter.frequency.value = 980;
-			filter.Q.value = 1.0;
+			filter.frequency.value = STATIC_CFG.tone.frequency.center;
+			filter.Q.value = STATIC_CFG.tone.q.center;
 			const gain = context.createGain();
 			gain.gain.value = 0;
 			node.connect(filter);
@@ -526,6 +1001,7 @@ createApp({
 			this.staticNode = node;
 			this.staticFilter = filter;
 			this.staticGain = gain;
+			this.startHumBed();
 			const {min, max} = getStaticLevelBounds();
 			this.staticLevelFactor = randomBetween(min, max);
 		})();
@@ -536,6 +1012,7 @@ createApp({
 		}
 	},
 	stopStatic() {
+		this.stopHumBed();
 		if (this.staticNode) {
 			try { this.staticNode.disconnect(); } catch {}
 		}
@@ -562,6 +1039,7 @@ createApp({
 		const applyStaticFade = () => {
 			this.retuneStaticTexture();
 			this.fadeStaticGain(this.staticTargetGain(), fadeMs, token);
+			this.setStaticHumTarget();
 		};
 		if (this.staticNode && this.staticFilter && this.staticGain) {
 			applyStaticFade();
@@ -575,6 +1053,7 @@ createApp({
 		const wasStatic = this.isStatic;
 		const token = this.beginTransition();
 		const targetVolume = this.clampVolume(this.volume / 100);
+		const staticBedTarget = this.stationBedStaticTarget();
 		this.isStatic = false;
 		this.index = index;
 		this.syncNeedle();
@@ -583,7 +1062,22 @@ createApp({
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, i === index ? targetVolume : 0, fadeMs, token);
 		}
-		this.fadeStaticGain(0, wasStatic ? fadeMs : this.stationToStationMs, token, !this.keepStaticEngineWarm);
+		const applyStaticBed = () => {
+			this.retuneStaticTexture();
+			this.fadeStaticGain(staticBedTarget, wasStatic ? fadeMs : this.stationToStationMs, token, false);
+			this.setStaticHumTarget();
+			this.applyWordWindowBurst(token, staticBedTarget);
+		};
+		if (this.staticNode && this.staticFilter && this.staticGain) {
+			applyStaticBed();
+			return;
+		}
+		this.startStatic().then(() => {
+			if (token !== this.fadeToken) return;
+			applyStaticBed();
+		}).catch((error) => {
+			console.warn('Background static start failed:', error?.message || error);
+		});
 	},
 	playNextSelection() {
 		if (this.shouldPlayStatic()) {
@@ -629,6 +1123,8 @@ createApp({
 		this.refreshStreamWarmPool(this.index);
 	},
 	stopAllStreams() {
+		this.clearChunkTimer();
+		this.clearMicroMuteTimer();
 		this.stopStatic();
 		this.isStatic = false;
 		for (let i = 0; i < this.number; i++) {
@@ -653,14 +1149,19 @@ createApp({
 		const token = this.beginTransition();
 		if (this.isStatic && this.staticGain) {
 			this.fadeStaticGain(this.staticTargetGain(), this.volumeRampMs, token);
+			this.setStaticHumTarget();
 			return;
+		}
+		if (this.staticGain) {
+			this.fadeStaticGain(this.stationBedStaticTarget(), this.volumeRampMs, token);
+			this.setStaticHumTarget();
 		}
 		for (const i of this.stations.keys()) {
 			this.fadeStation(i, i === this.index ? this.clampVolume(this.volume / 100) : 0, this.volumeRampMs, token);
 		}
 	},
 	updateStationCount() {
-		this.number = Math.max(1, Math.min(this.number, this.maxStations));
+		this.number = Math.max(this.stationsMin, Math.min(this.number, this.maxStations));
 		const stationCount = Math.min(this.number, this.allStations?.length ?? 0);
 		if (!stationCount) return;
 		if (this.index >= stationCount) this.index = 0;
@@ -687,6 +1188,8 @@ createApp({
 		if (!this.allStations?.length) return;
 		if (this.play) {
 			this.clearRetuneTimer();
+			this.clearChunkTimer();
+			this.clearMicroMuteTimer();
 			this.stopAllStreams();
 			this.play = false;
 			return;
@@ -698,9 +1201,13 @@ createApp({
 			this.startAllStreams();
 			this.playNextSelection();
 			this.retune();
+			this.updateChunking();
+			this.updateMicroMute();
 		});
 	},
 	mounted() {
+		this.updateChunkMode();
+		this.updateStaticPreset();
 		this.syncNeedle();
 		this.loadStations();
 	},
