@@ -151,11 +151,11 @@ const APP_CONFIG = {
 			default: 100,
 			visible: true,
 		},
-		staticRatio: {
+		stationDensity: {
 			min: 0,
 			max: 100,
 			step: 5,
-			default: 80,
+			default: 20,
 			visible: true,
 		},
 		jitterMs: {
@@ -169,6 +169,10 @@ const APP_CONFIG = {
 			visible: true,
 		},
 		staticPreset: {
+			visible: true,
+		},
+		sliderMotion: {
+			default: 1,
 			visible: true,
 		},
 	},
@@ -281,6 +285,11 @@ function clampValue(value, min, max) {
 	return Math.max(min, Math.min(max, Number(value) || 0));
 }
 
+function deepClone(value) {
+	if (typeof structuredClone === 'function') return structuredClone(value);
+	return JSON.parse(JSON.stringify(value));
+}
+
 function getStaticLevelBounds() {
 	const base = clampValue(STATIC_CFG.volume.relative, 0, 1);
 	const variance = Math.max(0, Number(STATIC_CFG.volume.variance) || 0);
@@ -324,6 +333,11 @@ function getChunkIntervalBounds() {
 
 const CHUNK_MODE_VALUES_MS = [0, 750, 1500];
 const STATIC_PRESET_ORDER = ['conservative', 'classic', 'aggressive'];
+const STATIC_PRESET_LABELS = {
+	conservative: 'Soft',
+	classic: 'Medium',
+	aggressive: 'Hard',
+};
 
 function clampModeIndex(value, maxIndex) {
 	return Math.max(0, Math.min(maxIndex, Number(value) || 0));
@@ -416,76 +430,134 @@ async function getStationsFromRadioBrowser(limit) {
 	return {stations: selected, source: `radio-browser:${RADIO_BROWSER_API_BASE}`};
 }
 
-createApp({
-	needleMotion: normalizeNeedleMotion(APP_CONFIG.ui.needleMotion),
-	tuneDisplayPercent: 0,
-	needleFrame: null,
-	stationToStationMs: APP_CONFIG.ui.transitions.stationToStationMs,
-	stationToStaticMs: APP_CONFIG.ui.transitions.stationToStaticMs,
-	staticToStationMs: APP_CONFIG.ui.transitions.staticToStationMs,
-	volumeRampMs: APP_CONFIG.ui.transitions.volumeRampMs,
-	keepStaticEngineWarm: APP_CONFIG.ui.transitions.keepStaticEngineWarm,
-	fadeToken: 0,
-	volumeMin: APP_CONFIG.controls.volume.min,
-	volumeMax: APP_CONFIG.controls.volume.max,
-	volumeStep: APP_CONFIG.controls.volume.step,
-	showVolumeControl: APP_CONFIG.controls.volume.visible !== false,
-	msMin: APP_CONFIG.controls.hopIntervalMs.min,
-	msMax: APP_CONFIG.controls.hopIntervalMs.max,
-	msStep: APP_CONFIG.controls.hopIntervalMs.step,
-	showMsControl: APP_CONFIG.controls.hopIntervalMs.visible !== false,
-	stationsMin: APP_CONFIG.controls.stations.min,
-	showStationsControl: APP_CONFIG.controls.stations.visible !== false,
-	staticRatioMin: APP_CONFIG.controls.staticRatio.min,
-	staticRatioMax: APP_CONFIG.controls.staticRatio.max,
-	staticRatioStep: APP_CONFIG.controls.staticRatio.step,
-	showStaticRatioControl: APP_CONFIG.controls.staticRatio.visible !== false,
-	jitterMin: APP_CONFIG.controls.jitterMs.min,
-	jitterMax: APP_CONFIG.controls.jitterMs.max,
-	jitterStep: APP_CONFIG.controls.jitterMs.step,
-	showJitterControl: APP_CONFIG.controls.jitterMs.visible !== false,
-	showChunkModeControl: APP_CONFIG.controls.chunkMode.visible !== false,
-	showStaticPresetControl: APP_CONFIG.controls.staticPreset.visible !== false,
-	staticRatio: clampValue(APP_CONFIG.controls.staticRatio.default, APP_CONFIG.controls.staticRatio.min, APP_CONFIG.controls.staticRatio.max),
-	jitterMs: clampValue(APP_CONFIG.controls.jitterMs.default, APP_CONFIG.controls.jitterMs.min, APP_CONFIG.controls.jitterMs.max),
-	isStatic: false,
-	staticPosition: 0,
-	staticNode: null,
-	staticFilter: null,
-	staticGain: null,
-	staticInitPromise: null,
-	staticHumOscA: null,
-	staticHumOscB: null,
-	staticHumGain: null,
-	staticHumPhase: 0,
-	staticLevelFactor: clampValue(STATIC_CFG.volume.relative, 0, 1),
-	staticToneDrift: 0,
-	staticToneVelocity: 0,
-	chunkingEnabled: Boolean(STATIC_CFG.chunking.enabledByDefault),
-	chunkModeMin: 0,
-	chunkModeMax: CHUNK_MODE_VALUES_MS.length - 1,
-	chunkModeStep: 1,
-	chunkMode: getInitialChunkMode(),
-	chunkIntervalMinMs: getChunkIntervalBounds().min,
-	chunkIntervalMaxMs: getChunkIntervalBounds().max,
-	staticPresetMin: 0,
-	staticPresetMax: STATIC_PRESET_ORDER.length - 1,
-	staticPresetStep: 1,
-	staticPresetMode: presetNameToMode(STATIC_CFG.preset),
-	chunkTimer: null,
-	microMuteTimer: null,
-	scanDirection: Math.random() < 0.5 ? -1 : 1,
-	scanRunRemaining: 0,
-	streamPrewarmCount: AUDIO_ENGINE.streamPrewarmCount,
-	maxStations: Math.max(1, APP_CONFIG.controls.stations.max),
-	number: Math.max(APP_CONFIG.controls.stations.min, Math.min(APP_CONFIG.controls.stations.default, APP_CONFIG.controls.stations.max)),
-	volume: clampValue(APP_CONFIG.controls.volume.default, APP_CONFIG.controls.volume.min, APP_CONFIG.controls.volume.max),
-	ms: clampValue(APP_CONFIG.controls.hopIntervalMs.default, APP_CONFIG.controls.hopIntervalMs.min, APP_CONFIG.controls.hopIntervalMs.max),
-	index: 0,
-	allStations: null,
-	retuneTimer: null,
-	play: false,
-	times: [50, 100, 250, 500, 750, 1000],
+function buildUiState() {
+	const transitions = APP_CONFIG.ui.transitions;
+	return {
+		needleMotion: normalizeNeedleMotion(APP_CONFIG.ui.needleMotion),
+		tuneDisplayPercent: 0,
+		needleFrame: null,
+		stationToStationMs: transitions.stationToStationMs,
+		stationToStaticMs: transitions.stationToStaticMs,
+		staticToStationMs: transitions.staticToStationMs,
+		volumeRampMs: transitions.volumeRampMs,
+		keepStaticEngineWarm: transitions.keepStaticEngineWarm,
+		fadeToken: 0,
+		times: [50, 100, 250, 500, 750, 1000],
+	};
+}
+
+function buildControlState() {
+	const controls = deepClone(APP_CONFIG.controls);
+	controls.stations.max = Math.max(1, controls.stations.max);
+	controls.stations.value = Math.max(controls.stations.min, Math.min(controls.stations.default, controls.stations.max));
+	controls.volume.value = clampValue(controls.volume.default, controls.volume.min, controls.volume.max);
+	controls.hopIntervalMs.value = clampValue(controls.hopIntervalMs.default, controls.hopIntervalMs.min, controls.hopIntervalMs.max);
+	controls.stationDensity.value = clampValue(controls.stationDensity.default, controls.stationDensity.min, controls.stationDensity.max);
+	controls.jitterMs.value = clampValue(controls.jitterMs.default, controls.jitterMs.min, controls.jitterMs.max);
+	controls.chunkMode.min = 0;
+	controls.chunkMode.max = CHUNK_MODE_VALUES_MS.length - 1;
+	controls.chunkMode.step = 1;
+	controls.chunkMode.value = getInitialChunkMode();
+	controls.staticPreset.min = 0;
+	controls.staticPreset.max = STATIC_PRESET_ORDER.length - 1;
+	controls.staticPreset.step = 1;
+	controls.staticPreset.value = presetNameToMode(STATIC_CFG.preset);
+	controls.sliderMotion.min = 0;
+	controls.sliderMotion.max = 1;
+	controls.sliderMotion.step = 1;
+	controls.sliderMotion.value = clampModeIndex(controls.sliderMotion.default, controls.sliderMotion.max);
+	return {
+		controls,
+	};
+}
+
+function buildStaticState() {
+	return {
+		isStatic: false,
+		staticPosition: 0,
+		staticNode: null,
+		staticFilter: null,
+		staticGain: null,
+		staticInitPromise: null,
+		staticHumOscA: null,
+		staticHumOscB: null,
+		staticHumGain: null,
+		staticHumPhase: 0,
+		staticLevelFactor: clampValue(STATIC_CFG.volume.relative, 0, 1),
+		staticToneDrift: 0,
+		staticToneVelocity: 0,
+		chunkingEnabled: Boolean(STATIC_CFG.chunking.enabledByDefault),
+		chunkIntervalMinMs: getChunkIntervalBounds().min,
+		chunkIntervalMaxMs: getChunkIntervalBounds().max,
+		chunkTimer: null,
+		microMuteTimer: null,
+		scanDirection: Math.random() < 0.5 ? -1 : 1,
+		scanRunRemaining: 0,
+		streamPrewarmCount: AUDIO_ENGINE.streamPrewarmCount,
+	};
+}
+
+function buildRuntimeState() {
+	return {
+		index: 0,
+		sweepCursor: 0,
+		allStations: null,
+		retuneTimer: null,
+		play: false,
+	};
+}
+
+const SPIRIT_APP_COMPUTED = {
+	get stationDigits() {
+		return Array.from({length: this.controls.stations.value}, (_, i) => i + 1);
+	},
+	get barPrimary() {
+		return '|'.repeat(512);
+	},
+	get barSecondary() {
+		return Array.from({length: 64}, () => '....|').join('') + '....';
+	},
+	get stations() {
+		return this.allStations?.slice(0, this.controls.stations.value) ?? [];
+	},
+	get chunkModeMs() {
+		return chunkModeToMs(this.controls.chunkMode.value);
+	},
+	get chunkModeLabel() {
+		return this.chunkModeMs === 0 ? 'Off' : `${this.chunkModeMs}ms`;
+	},
+	get staticPresetName() {
+		return presetModeToName(this.controls.staticPreset.value);
+	},
+	get staticPresetLabel() {
+		return STATIC_PRESET_LABELS[this.staticPresetName] || 'Medium';
+	},
+	get sliderMotionLabel() {
+		return this.controls.sliderMotion.value === 1 ? 'Sweep' : 'Random';
+	},
+	get station() {
+		if (!this.play || this.isStatic) return null;
+		return this.stations?.[this.index];
+	},
+	get currentStationNumber() {
+		if (this.isStatic) return 0;
+		return Math.min(this.controls.stations.value, Math.max(1, this.index + 1));
+	},
+	get tunePercent() {
+		if (this.controls.stations.value <= 1) return 0;
+		const source = this.isStatic ? this.staticPosition : this.index;
+		const clamped = Math.min(this.controls.stations.value - 1, Math.max(0, source));
+		return (clamped / (this.controls.stations.value - 1)) * 100;
+	},
+	get needleMotionClass() {
+		return `motion-${this.needleMotion}`;
+	},
+	get needleStyle() {
+		return {left: `${this.tuneDisplayPercent}%`};
+	},
+};
+
+const SPIRIT_APP_METHODS = {
 	playSilently(audio) {
 		if (!audio?.paused) return;
 		const playPromise = audio.play?.();
@@ -497,8 +569,11 @@ createApp({
 	},
 	applyStations(stations) {
 		this.allStations = stations;
-		if (this.number > this.allStations.length) {
-			this.number = this.allStations.length;
+		if (this.controls.stations.value > this.allStations.length) {
+			this.controls.stations.value = this.allStations.length;
+		}
+		if (this.sweepCursor >= this.controls.stations.value) {
+			this.sweepCursor = 0;
 		}
 		this.syncNeedle();
 	},
@@ -506,7 +581,7 @@ createApp({
 		const preferFile = new URLSearchParams(window.location.search).get('source') === 'file';
 		if (!preferFile) {
 			try {
-				const remote = await getStationsFromRadioBrowser(this.maxStations);
+				const remote = await getStationsFromRadioBrowser(this.controls.stations.max);
 				this.applyStations(remote.stations);
 				return;
 			} catch (error) {
@@ -524,51 +599,6 @@ createApp({
 			console.error('Failed to load stations from remote API and stations.json', error);
 			this.allStations = [];
 		}
-	},
-	get stationDigits() {
-		return Array.from({length: this.number}, (_, i) => i + 1);
-	},
-	get barPrimary() {
-		return '|'.repeat(512);
-	},
-	get barSecondary() {
-		return Array.from({length: 64}, () => '....|').join('') + '....';
-	},
-	get stations() {
-		return this.allStations?.slice(0, this.number) ?? [];
-	},
-	get chunkModeMs() {
-		return chunkModeToMs(this.chunkMode);
-	},
-	get chunkModeLabel() {
-		return this.chunkModeMs === 0 ? 'Off' : `${this.chunkModeMs}ms`;
-	},
-	get staticPresetName() {
-		return presetModeToName(this.staticPresetMode);
-	},
-	get staticPresetLabel() {
-		const name = this.staticPresetName;
-		return name.charAt(0).toUpperCase() + name.slice(1);
-	},
-	get station() {
-		if (!this.play || this.isStatic) return null;
-		return this.stations?.[this.index];
-	},
-	get currentStationNumber() {
-		if (this.isStatic) return 0;
-		return Math.min(this.number, Math.max(1, this.index + 1));
-	},
-	get tunePercent() {
-		if (this.number <= 1) return 0;
-		const source = this.isStatic ? this.staticPosition : this.index;
-		const clamped = Math.min(this.number - 1, Math.max(0, source));
-		return (clamped / (this.number - 1)) * 100;
-	},
-	get needleMotionClass() {
-		return `motion-${this.needleMotion}`;
-	},
-	get needleStyle() {
-		return {left: `${this.tuneDisplayPercent}%`};
 	},
 	syncNeedle() {
 		const target = this.tunePercent;
@@ -653,7 +683,7 @@ createApp({
 	},
 	stationBedStaticTarget() {
 		const relative = clampValue(STATIC_CFG.volume.stationBedRelative, 0, 1);
-		return this.clampVolume((this.volume / 100) * relative);
+		return this.clampVolume((this.controls.volume.value / 100) * relative);
 	},
 	setStaticHumTarget() {
 		if (!STATIC_CFG.hum.enabled || !this.staticHumGain) return;
@@ -771,7 +801,7 @@ createApp({
 		this.scheduleChunkTick();
 	},
 	updateChunkMode() {
-		this.chunkMode = clampModeIndex(this.chunkMode, this.chunkModeMax);
+		this.controls.chunkMode.value = clampModeIndex(this.controls.chunkMode.value, this.controls.chunkMode.max);
 		const ms = this.chunkModeMs;
 		this.chunkingEnabled = ms > 0;
 		this.chunkIntervalMinMs = ms;
@@ -779,10 +809,10 @@ createApp({
 		this.updateChunking();
 	},
 	updateStaticPreset() {
-		this.staticPresetMode = clampModeIndex(this.staticPresetMode, this.staticPresetMax);
+		this.controls.staticPreset.value = clampModeIndex(this.controls.staticPreset.value, this.controls.staticPreset.max);
 		const name = this.staticPresetName;
 		if (!applyStaticPreset(APP_CONFIG, name)) return;
-		if (this.chunkMode !== 0) this.updateChunkMode();
+		if (this.controls.chunkMode.value !== 0) this.updateChunkMode();
 		if (this.staticNode && this.staticFilter && this.staticGain) {
 			this.retuneStaticTexture(false);
 			this.setStaticHumTarget();
@@ -867,6 +897,12 @@ createApp({
 	},
 	chooseNextIndex() {
 		const count = this.stations.length;
+		if (count <= 1) return 0;
+		if (this.controls.sliderMotion.value === 1) {
+			const next = this.sweepCursor % count;
+			this.sweepCursor = (next + 1) % count;
+			return next;
+		}
 		const scanNext = this.nextScanIndex(count);
 		if (scanNext !== null) return scanNext;
 		let next = Math.floor(Math.random() * count);
@@ -877,16 +913,28 @@ createApp({
 		}
 		return next;
 	},
-	chooseStaticPosition() {
-		if (this.number <= 1) return 0;
-		const base = Math.floor(Math.random() * (this.number - 1));
+	chooseStaticPosition(targetIndex = null) {
+		if (this.controls.stations.value <= 1) return 0;
+		if (Number.isFinite(targetIndex)) {
+			const clamped = Math.max(0, Math.min(this.controls.stations.value - 1, targetIndex));
+			return clamped;
+		}
+		const base = Math.floor(Math.random() * (this.controls.stations.value - 1));
 		const between = 0.15 + Math.random() * 0.7;
 		return base + between;
 	},
+	updateSliderMotion() {
+		this.controls.sliderMotion.value = clampModeIndex(this.controls.sliderMotion.value, this.controls.sliderMotion.max);
+		if (this.controls.sliderMotion.value === 1 && this.stations.length) {
+			this.sweepCursor = this.isStatic ? 0 : (this.index + 1) % this.stations.length;
+		}
+	},
 	shouldPlayStatic() {
 		if (!this.play || !this.stations.length) return false;
-		if (this.staticRatio <= 0) return false;
-		return Math.random() * 100 < this.staticRatio;
+		this.controls.stationDensity.value = clampValue(this.controls.stationDensity.value, this.controls.stationDensity.min, this.controls.stationDensity.max);
+		const staticChance = 100 - this.controls.stationDensity.value;
+		if (staticChance <= 0) return false;
+		return Math.random() * 100 < staticChance;
 	},
 	clampVolume(value) {
 		return Math.max(0, Math.min(1, value));
@@ -944,7 +992,7 @@ createApp({
 		requestAnimationFrame(step);
 	},
 	staticTargetGain() {
-		return this.clampVolume((this.volume / 100) * this.staticLevelFactor);
+		return this.clampVolume((this.controls.volume.value / 100) * this.staticLevelFactor);
 	},
 	retuneStaticTexture(advanceDrift = true) {
 		if (!this.staticFilter) return;
@@ -1026,11 +1074,11 @@ createApp({
 		this.staticFilter = null;
 		this.staticGain = null;
 	},
-	playStatic() {
+	playStatic(targetIndex = null) {
 		const wasStatic = this.isStatic;
 		const token = this.beginTransition();
 		this.isStatic = true;
-		this.staticPosition = this.chooseStaticPosition();
+		this.staticPosition = this.chooseStaticPosition(targetIndex);
 		this.syncNeedle();
 		const fadeMs = wasStatic ? Math.max(240, Math.floor(this.stationToStaticMs * 0.7)) : this.stationToStaticMs;
 		for (const i of this.stations.keys()) {
@@ -1052,7 +1100,7 @@ createApp({
 	playStation(index) {
 		const wasStatic = this.isStatic;
 		const token = this.beginTransition();
-		const targetVolume = this.clampVolume(this.volume / 100);
+		const targetVolume = this.clampVolume(this.controls.volume.value / 100);
 		const staticBedTarget = this.stationBedStaticTarget();
 		this.isStatic = false;
 		this.index = index;
@@ -1080,20 +1128,20 @@ createApp({
 		});
 	},
 	playNextSelection() {
+		const next = this.chooseNextIndex();
 		if (this.shouldPlayStatic()) {
-			this.playStatic();
+			this.playStatic(next);
 			return;
 		}
-		const next = this.chooseNextIndex();
 		this.playStation(next);
 	},
 	nextRetuneDelay() {
-		this.ms = clampValue(this.ms, this.msMin, this.msMax);
-		this.staticRatio = clampValue(this.staticRatio, this.staticRatioMin, this.staticRatioMax);
-		this.jitterMs = clampValue(this.jitterMs, this.jitterMin, this.jitterMax);
-		const jitter = this.jitterMs;
-		const min = Math.max(50, this.ms - jitter);
-		const max = this.ms + jitter;
+		this.controls.hopIntervalMs.value = clampValue(this.controls.hopIntervalMs.value, this.controls.hopIntervalMs.min, this.controls.hopIntervalMs.max);
+		this.controls.stationDensity.value = clampValue(this.controls.stationDensity.value, this.controls.stationDensity.min, this.controls.stationDensity.max);
+		this.controls.jitterMs.value = clampValue(this.controls.jitterMs.value, this.controls.jitterMs.min, this.controls.jitterMs.max);
+		const jitter = this.controls.jitterMs.value;
+		const min = Math.max(50, this.controls.hopIntervalMs.value - jitter);
+		const max = this.controls.hopIntervalMs.value + jitter;
 		return Math.floor(min + Math.random() * (max - min + 1));
 	},
 	scheduleRetuneTick() {
@@ -1127,7 +1175,7 @@ createApp({
 		this.clearMicroMuteTimer();
 		this.stopStatic();
 		this.isStatic = false;
-		for (let i = 0; i < this.number; i++) {
+		for (let i = 0; i < this.controls.stations.value; i++) {
 			const audio = this.getAudio(i);
 			if (!audio) continue;
 			audio.muted = true;
@@ -1141,11 +1189,11 @@ createApp({
 		for (const i of this.stations.keys()) {
 			this.setAudioVolume(i, 0);
 		}
-		this.setAudioVolume(index, this.volume / 100);
+		this.setAudioVolume(index, this.controls.volume.value / 100);
 	},
 	updateVolume() {
 		if (!this.play) return;
-		this.volume = clampValue(this.volume, this.volumeMin, this.volumeMax);
+		this.controls.volume.value = clampValue(this.controls.volume.value, this.controls.volume.min, this.controls.volume.max);
 		const token = this.beginTransition();
 		if (this.isStatic && this.staticGain) {
 			this.fadeStaticGain(this.staticTargetGain(), this.volumeRampMs, token);
@@ -1157,14 +1205,15 @@ createApp({
 			this.setStaticHumTarget();
 		}
 		for (const i of this.stations.keys()) {
-			this.fadeStation(i, i === this.index ? this.clampVolume(this.volume / 100) : 0, this.volumeRampMs, token);
+			this.fadeStation(i, i === this.index ? this.clampVolume(this.controls.volume.value / 100) : 0, this.volumeRampMs, token);
 		}
 	},
 	updateStationCount() {
-		this.number = Math.max(this.stationsMin, Math.min(this.number, this.maxStations));
-		const stationCount = Math.min(this.number, this.allStations?.length ?? 0);
+		this.controls.stations.value = Math.max(this.controls.stations.min, Math.min(this.controls.stations.value, this.controls.stations.max));
+		const stationCount = Math.min(this.controls.stations.value, this.allStations?.length ?? 0);
 		if (!stationCount) return;
 		if (this.index >= stationCount) this.index = 0;
+		if (this.sweepCursor >= stationCount) this.sweepCursor = 0;
 		this.syncNeedle();
 		if (this.play) {
 			queueMicrotask(() => {
@@ -1195,6 +1244,7 @@ createApp({
 			return;
 		}
 		this.play = true;
+		this.updateSliderMotion();
 		this.shuffle();
 		queueMicrotask(() => {
 			this.ensureAudioContext();
@@ -1206,9 +1256,24 @@ createApp({
 		});
 	},
 	mounted() {
+		this.updateSliderMotion();
 		this.updateChunkMode();
 		this.updateStaticPreset();
 		this.syncNeedle();
 		this.loadStations();
 	},
-}).mount();
+};
+
+function buildAppDefinition() {
+	const app = {
+		...buildUiState(),
+		...buildControlState(),
+		...buildStaticState(),
+		...buildRuntimeState(),
+		...SPIRIT_APP_METHODS,
+	};
+	Object.defineProperties(app, Object.getOwnPropertyDescriptors(SPIRIT_APP_COMPUTED));
+	return app;
+}
+
+createApp(buildAppDefinition()).mount();
